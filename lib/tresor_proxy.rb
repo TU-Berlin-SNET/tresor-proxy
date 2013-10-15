@@ -27,6 +27,7 @@ module Tresor
         end
       rescue Exception => e
         puts "Error in TRESOR Proxy: #{e}"
+        puts e.backtrace
       end
     end
 
