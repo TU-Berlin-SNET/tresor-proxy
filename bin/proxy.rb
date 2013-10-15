@@ -11,7 +11,7 @@ opts = Slop.parse do
   on 't', 'trace', 'Enable tracing'
 end
 
-proxy = Tresor::TresorProxy.new(opts[:ip] || '127.0.0.1', opts[:port] || '80')
+proxy = Tresor::TresorProxy.new(opts[:ip] || '0.0.0.0', opts[:port] || '80')
 
 require 'ruby-prof' if opts.trace?
 
