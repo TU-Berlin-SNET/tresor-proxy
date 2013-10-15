@@ -16,10 +16,16 @@ EventMachine.threadpool_size = opts[:threadpool] || 20
 
 proxy = Tresor::TresorProxy.new(opts[:ip] || '0.0.0.0', opts[:port] || '80')
 
-require 'ruby-prof' if opts.trace?
+require 'ruby-prof' if (opts.trace? && RUBY_PLATFORM != 'java')
 
 Thread.new do
-  RubyProf.start if opts.trace?
+  if opts.trace?
+    if RUBY_PLATFORM != 'java' then
+      RubyProf.start
+    else
+      JRuby::Profiler.start
+    end
+  end
 
   proxy.start
 end
@@ -31,10 +37,19 @@ $stdin.gets.chomp!
 proxy.stop
 
 if opts.trace?
-  result = RubyProf.stop
+  if RUBY_PLATFORM != 'java' then
+    result = RubyProf.stop
 
-  printer = RubyProf::CallTreePrinter.new(result)
-  File.open('profile-results', 'w') do |f|
-    printer.print(f)
+    printer = RubyProf::CallTreePrinter.new(result)
+    File.open('profile-results', 'w') do |f|
+      printer.print(f)
+    end
+  else
+    result = JRuby::Profiler.stop
+
+    printer = JRuby::Profiler::GraphPrinter.new(result)
+    File.open('profile-results', 'w') do |f|
+      printer.printProfile(f)
+    end
   end
 end

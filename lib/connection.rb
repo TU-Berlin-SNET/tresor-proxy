@@ -37,13 +37,7 @@ module Tresor
     end
 
     def receive_data(data)
-      pause
-
-      EM.defer do
-        @http_parser << data
-
-        resume
-      end
+      @http_parser << data
     end
 
     def relay_from_backend(data)

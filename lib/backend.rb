@@ -28,9 +28,7 @@ module Tresor
     def receive_data(data)
       @plexer.relay_from_backend data
 
-      EM.defer do
-        @http_parser << data
-      end
+      @http_parser << data
     end
 
     # Buffer data until the connection to the backend server
