@@ -14,7 +14,7 @@ module Tresor
 
         host_connection = @free_host_connections[host].pop
         if host_connection == nil
-          host_connection = EventMachine::connect('127.0.0.1', '3000', Tresor::Backend) do |c|
+          host_connection = EventMachine::connect('217.79.181.30', '3001', Tresor::Backend) do |c|
             c.host = host
           end
         end
