@@ -6,8 +6,8 @@ require 'slop'
 opts = Slop.parse do
   banner 'Usage: proxy.rb [options]'
 
-  on 'i', 'ip', 'The ip address to bind to (default: all)'
-  on 'p', 'port', 'The port number (default: 80)'
+  on 'i=', 'ip', 'The ip address to bind to (default: all)'
+  on 'p=', 'port', 'The port number (default: 80)'
   on 't', 'trace', 'Enable tracing'
 end
 
