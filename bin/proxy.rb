@@ -8,8 +8,11 @@ opts = Slop.parse do
 
   on 'i=', 'ip', 'The ip address to bind to (default: all)'
   on 'p=', 'port', 'The port number (default: 80)'
+  on 's=', 'threadpool', 'The Eventmachine thread pool size (default: 20)'
   on 't', 'trace', 'Enable tracing'
 end
+
+EventMachine.threadpool_size = opts[:threadpool] || 20
 
 proxy = Tresor::TresorProxy.new(opts[:ip] || '0.0.0.0', opts[:port] || '80')
 
