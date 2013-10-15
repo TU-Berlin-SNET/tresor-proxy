@@ -23,7 +23,7 @@ end
 
 puts 'Press any key to exit'
 
-readline
+$stdin.gets.chomp!
 
 proxy.stop
 
