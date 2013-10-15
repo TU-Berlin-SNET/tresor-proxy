@@ -11,14 +11,22 @@ module Tresor
     end
 
     def start
-      EM.epoll
-      EM.run do
-        trap("TERM") { stop }
-        trap("INT")  { stop }
+      begin
+        EM.epoll
+        EM.run do
+          trap("TERM") { stop }
+          trap("INT")  { stop }
 
-        EventMachine::start_server(@host, @port, Tresor::Connection)
+          EM.error_handler do |e|
+            puts "Error in event loop callback: #{e} #{e.message}"
+          end
 
-        puts "TRESOR Proxy started on #{@host}:#{@port}"
+          EventMachine::start_server(@host, @port, Tresor::Connection)
+
+          puts "TRESOR Proxy started on #{@host}:#{@port}"
+        end
+      rescue Exception => e
+        puts "Error in TRESOR Proxy: #{e}"
       end
     end
 
