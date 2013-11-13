@@ -1,9 +1,13 @@
 require_relative 'connection'
+require_relative 'logging'
 
 module Tresor
   class TresorProxy
     attr :host
     attr :port
+
+    attr_accessor :is_tctp_client
+    attr_accessor :is_tctp_server
 
     def initialize(host, port)
       @host = host
@@ -18,22 +22,37 @@ module Tresor
           trap("INT")  { stop }
 
           EM.error_handler do |e|
-            puts "Error in event loop callback: #{e} #{e.message}"
+            log.warn { "Error in event loop callback: #{e} #{e.message}" }
+            log.warn { e.backtrace }
           end
 
-          EventMachine::start_server(@host, @port, Tresor::Connection)
+          EventMachine::start_server(@host, @port, Tresor::Connection) do |c|
+            c.proxy = self
+          end
 
-          puts "TRESOR Proxy started on #{@host}:#{@port}"
+          log.info { "TRESOR Proxy started on #{@host}:#{@port}" }
+
+          #if(log.level == Logger::DEBUG)
+          #  EventMachine.add_periodic_timer(5) do
+          #    free_connections_number = Tresor::ConnectionPool.instance_variable_get(:@free_backends).values.collect{|v| v.size}.reduce :+
+          #
+          #    log.debug ('ConnectionPool') {"#{free_connections_number} reusable connections."}
+          #  end
+          #end
         end
       rescue Exception => e
-        puts "Error in TRESOR Proxy: #{e}"
-        puts e.backtrace
+        log.fatal { "Error in TRESOR Proxy: #{e}" }
+        log.fatal { e.backtrace }
       end
     end
 
     def stop
-      puts "Terminating ProxyServer"
+      log.info { "Terminating ProxyServer" }
       EventMachine.stop
+    end
+
+    def log
+      @@logger
     end
   end
 end
