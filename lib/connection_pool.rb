@@ -5,10 +5,16 @@ require 'uri'
 require 'resolv'
 
 module Tresor
-  module ConnectionPool
-    @free_backends = {}
+  class ConnectionPool
+    attr_reader :free_backends
+    attr_reader :proxy
 
-    def self.get_backend_future_for_forward_url(url, client_connection)
+    def initialize(proxy)
+      @proxy = proxy
+      @free_backends = {}
+    end
+
+    def get_backend_future_for_forward_url(url, client_connection)
       uri = URI.parse(url)
 
       ipInt = Socket.gethostbyname(uri.host)[3]
@@ -17,11 +23,21 @@ module Tresor
       get_backend_future_for_host(ip, uri.port, uri.host, client_connection)
     end
 
-    def self.get_backend_future_for_reverse_host(host, client_connection)
-      #self.get_backend_future_for_host()
+    def get_backend_future_for_reverse_host(host, client_connection)
+      requested_host = host.partition(':').first
+
+      reverse_host = @proxy.reverse_mappings[requested_host]
+
+      if reverse_host
+        get_backend_future_for_forward_url(reverse_host, client_connection)
+      else
+        backend_future = EventMachine::DefaultDeferrable.new
+        backend_future.fail "This proxy is not configured to reverse proxy #{requested_host}"
+        backend_future
+      end
     end
 
-    def self.get_backend_future_for_host(ip, port, host, client_connection)
+    def get_backend_future_for_host(ip, port, host, client_connection)
       backend_future = EventMachine::DefaultDeferrable.new
 
       connection_key = "#{ip}:#{port}"
@@ -30,7 +46,7 @@ module Tresor
         @free_backends[connection_key] ||= []
 
         backend = @free_backends[connection_key].pop
-        if backend == nil
+        if backend.nil?
           backend = EventMachine::connect(ip, port, Tresor::Backend::BasicBackend) do |b|
             b.connection_pool_key = connection_key
             b.host = host
@@ -48,11 +64,11 @@ module Tresor
       backend_future
     end
 
-    def self.backend_free(connection_pool_key, backend)
+    def backend_free(connection_pool_key, backend)
       @free_backends[connection_pool_key] << backend
     end
 
-    def self.backend_unbind(connection_pool_key, backend)
+    def backend_unbind(connection_pool_key, backend)
       @free_backends[connection_pool_key].delete(backend)
     end
   end

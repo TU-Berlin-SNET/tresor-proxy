@@ -47,7 +47,7 @@ module Tresor
       def free_backend
         reset_backend_handler
 
-        Tresor::ConnectionPool.backend_unbind(connection_pool_key, self)
+        proxy.connection_pool.backend_unbind(connection_pool_key, self)
       end
 
       # Receives current client request

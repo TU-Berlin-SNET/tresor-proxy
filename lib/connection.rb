@@ -23,10 +23,10 @@ module Tresor
 
         if @http_parser.request_url.start_with?('http')
           # Forward proxy
-          @backend_future = Tresor::ConnectionPool.get_backend_future_for_forward_url(@http_parser.request_url, self)
+          @backend_future = proxy.connection_pool.get_backend_future_for_forward_url(@http_parser.request_url, self)
         else
           # Reverse proxy
-          @backend_future = Tresor::ConnectionPool.get_backend_future_for_reverse_host(@http_parser.headers['Host'], self)
+          @backend_future = proxy.connection_pool.get_backend_future_for_reverse_host(@http_parser.headers['Host'], self)
         end
 
         @backend_future.callback do |backend|
@@ -78,6 +78,7 @@ module Tresor
 
     def send_error_response(error)
       send_data "HTTP/1.1 502 Bad Gateway\r\n"
+      send_data "Content-Length: #{error.size}\r\n"
       send_data "\r\n"
       send_data error
     end

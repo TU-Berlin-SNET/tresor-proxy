@@ -1,5 +1,6 @@
 require_relative 'connection'
 require_relative 'logging'
+require_relative 'connection_pool'
 
 module Tresor
   class TresorProxy
@@ -8,10 +9,13 @@ module Tresor
 
     attr_accessor :is_tctp_client
     attr_accessor :is_tctp_server
+    attr_accessor :reverse_mappings
+    attr_accessor :connection_pool
 
     def initialize(host, port)
       @host = host
       @port = port
+      @connection_pool = ConnectionPool.new(self)
     end
 
     def start
