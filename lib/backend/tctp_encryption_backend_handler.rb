@@ -9,7 +9,7 @@ class Tresor::Backend::TCTPEncryptionBackendHandler < Tresor::Backend::BackendHa
 
     log.debug (log_key) { "Encrypting to backend: #{start_line[0..-2]}" }
 
-    cookie = Tresor::TCTP::HALECRegistry.get_tctp_cookie(backend.host)
+    cookie = @backend.proxy.halec_registry.get_tctp_cookie(backend.host)
     tctp_cookie_sent = false
 
     @backend.send_data start_line
@@ -111,7 +111,7 @@ class Tresor::Backend::TCTPEncryptionBackendHandler < Tresor::Backend::BackendHa
 
     @halec.reset if @encrypted_response
 
-    Tresor::TCTP::HALECRegistry.return_halec_promise(@halec_promise)
+    @halec_promise.return
 
     @backend.free_backend
   end

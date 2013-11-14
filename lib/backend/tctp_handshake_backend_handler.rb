@@ -19,7 +19,7 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
 
         log.debug (log_key) {"Got HALEC cookie: #{@cookie}"}
 
-        Tresor::TCTP::HALECRegistry.register_tctp_cookie(@backend.host, @cookie)
+        @backend.proxy.halec_registry.register_tctp_cookie(@backend.host, @cookie)
       end
     end
 
@@ -39,7 +39,7 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
           @halec.halec_handshake_complete.callback do
             log.debug (log_key) { "TCTP Handshake complete. HALEC #{@halec.url} ready for encrypting data"}
 
-            Tresor::TCTP::HALECRegistry.register_halec @handshake_url, @halec
+            @backend.proxy.halec_registry.register_halec @handshake_url, @halec
 
             @backend.decide_handler
           end

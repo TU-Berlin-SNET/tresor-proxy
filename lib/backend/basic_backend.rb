@@ -65,7 +65,7 @@ module Tresor
           if Tresor::TCTP.tctp_status_known?(@host)
             if Tresor::TCTP.is_tctp_server?(@host) && Tresor::TCTP.is_tctp_protected?(@host, @client_path)
               begin
-                promise = Tresor::TCTP::HALECRegistry.promise_for(@host, @client_path)
+                promise = @proxy.halec_registry.promise_for(@host, @client_path)
 
                 @backend_handler = TCTPEncryptionBackendHandler.new(self, promise)
               rescue Tresor::TCTP::HALECUnavailable

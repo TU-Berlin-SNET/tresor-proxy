@@ -11,11 +11,13 @@ module Tresor
     attr_accessor :is_tctp_server
     attr_accessor :reverse_mappings
     attr_accessor :connection_pool
+    attr_accessor :halec_registry
 
     def initialize(host, port)
       @host = host
       @port = port
       @connection_pool = ConnectionPool.new(self)
+      @halec_registry = TCTP::HALECRegistry.new
     end
 
     def start
