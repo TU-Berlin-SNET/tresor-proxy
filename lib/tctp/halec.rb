@@ -55,34 +55,19 @@ class Tresor::TCTP::HALEC
   end
 
   def write_encrypted_data(data)
-    begin
-      result = @socket_there.write_nonblock(data)
+    result = @socket_there.write(data)
 
-      log.debug(log_key) {"Written #{result} of #{data.length} bytes to encrypted socket."}
+    log.debug(log_key) {"Written #{result} of #{data.length} bytes to encrypted socket."}
 
-      log_state
-    rescue Exception => e
-      IO.select(nil, [@socket_there])
-      retry
-    end
+    log_state
   end
 
   def write_decrypted_data(data)
-    begin
-      result = @ssl_socket.write_nonblock(data)
+    result = @ssl_socket.write(data)
 
-      @ssl_socket.flush
+    log.debug (log_key) {"Written #{result} of #{data.length} bytes to SSL socket."}
 
-      log.debug (log_key) {"Written #{result} of #{data.length} bytes to SSL socket."}
-
-      log_state
-    rescue IO::WaitReadable
-      IO.select([@ssl_socket])
-      retry
-    rescue IO::WaitWritable
-      IO.select(nil, [@ssl_socket])
-      retry
-    end
+    log_state
   end
 
   def begin_reading_decrypted_data
@@ -90,7 +75,7 @@ class Tresor::TCTP::HALEC
       begin
         while true
           begin
-            read_data = @ssl_socket.read_nonblock(2 ** 12)
+            read_data = @ssl_socket.read_nonblock(2 ** 20)
 
             log.debug (log_key) {"Read #{read_data.length} bytes plaintext from SSL socket."}
 
@@ -98,7 +83,7 @@ class Tresor::TCTP::HALEC
 
             @on_decrypted_data_read.call read_data
 
-            if(read_data.length < 2 ** 12 && @socket_here.ready? == false)
+            if(read_data.length < 2 ** 20 && @socket_here.ready? == false)
               log.debug (log_key) { 'Decrypted data reads finished' }
 
               @on_decrypted_data_read.call :finished

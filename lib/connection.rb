@@ -165,10 +165,7 @@ module Tresor
 
         log.debug (log_key) { "Sending #{decrypted_data.length} (#{chunk_length_as_hex}) bytes of decrypted data from client to backend" }
 
-        @backend.client_chunk chunk_length_as_hex
-        @backend.client_chunk "\r\n"
-        @backend.client_chunk decrypted_data
-        @backend.client_chunk "\r\n"
+        @backend.client_chunk "#{chunk_length_as_hex}\r\n#{decrypted_data}\r\n"
       end
     end
 
