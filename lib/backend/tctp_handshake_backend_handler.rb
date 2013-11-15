@@ -1,11 +1,11 @@
 require_relative '../tctp/tctp'
-require_relative '../tctp/halec'
+require_relative '../tctp/client_halec'
 
 class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHandler
   def initialize(backend)
     @backend = backend
 
-    @halec = Tresor::TCTP::HALEC.new
+    @halec = Tresor::TCTP::ClientHALEC.new
 
     @http_parser = HTTP::Parser.new
     @http_parser.on_headers_complete = proc do |headers|
@@ -30,7 +30,7 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
     end
 
     @http_parser.on_message_complete = proc do |env|
-      @halec.encrypted_data_read_queue.pop do |handshake_response|
+      @halec.on_encrypted_data_read = proc do |handshake_response|
         log.debug (log_key) { "POSTing #{handshake_response.length} bytes client handshake response to HALEC URL #{@halec.url}" }
 
         @http_parser.reset!
@@ -54,7 +54,7 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
       end
     end
 
-    @halec.encrypted_data_read_queue.pop do |data|
+    @halec.on_encrypted_data_read = proc do |data|
       @handshake_url = Tresor::TCTP.handshake_url(@backend.host, @backend.client_path)
 
       @http_parser.reset!
@@ -69,6 +69,8 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
     end
 
     @backend.receive_data_future.succeed self
+
+    @halec.begin_reading_encrypted_data
   end
 
   def receive_data(data)
@@ -78,6 +80,6 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
   end
 
   def log_key
-    'TCTP Handshake Handler'
+    "#{@backend.proxy.name} - TCTP Handshake Handler"
   end
 end

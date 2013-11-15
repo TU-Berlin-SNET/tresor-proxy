@@ -37,7 +37,7 @@ module Tresor
       end
 
       def log_key
-        "Relay Handler"
+        "#{@backend.proxy.name} - Relay Handler"
       end
     end
   end

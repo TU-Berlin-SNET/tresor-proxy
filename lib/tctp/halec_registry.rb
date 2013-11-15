@@ -33,9 +33,7 @@ module Tresor
       end
 
       def register_halec(handshake_url, halec)
-        @halecs[handshake_url][halec.url] = halec
-
-        @tctp_cookies[halec]
+        halecs(handshake_url)[halec.url] = halec
       end
 
       class HALECPromise

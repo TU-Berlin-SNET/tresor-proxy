@@ -3,7 +3,7 @@ require 'eventmachine'
 require_relative 'relaying_backend_handler'
 require_relative 'tctp_discovery_backend_handler'
 require_relative 'tctp_handshake_backend_handler'
-require_relative 'tctp_encryption_backend_handler'
+require_relative 'tctp_encrypt_to_backend_handler'
 
 require_relative '../tctp/halec_registry'
 
@@ -67,7 +67,7 @@ module Tresor
               begin
                 promise = @proxy.halec_registry.promise_for(@host, @client_path)
 
-                @backend_handler = TCTPEncryptionBackendHandler.new(self, promise)
+                @backend_handler = TCTPEncryptToBackendHandler.new(self, promise)
               rescue Tresor::TCTP::HALECUnavailable
                 log.debug (log_key) { "Performing TCTP handshake to create HALEC for #{@host}" }
 
@@ -102,7 +102,7 @@ module Tresor
       end
 
       def log_key
-        "Backend #{@connection_pool_key} #{@host}"
+        "#{proxy.name} - Backend #{@connection_pool_key} #{@host}"
       end
     end
   end

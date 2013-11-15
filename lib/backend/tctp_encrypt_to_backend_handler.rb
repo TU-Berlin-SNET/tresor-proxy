@@ -1,4 +1,4 @@
-class Tresor::Backend::TCTPEncryptionBackendHandler < Tresor::Backend::BackendHandler
+class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHandler
   def initialize(backend, halec_promise)
     @backend = backend
     @halec_promise = halec_promise
@@ -29,10 +29,12 @@ class Tresor::Backend::TCTPEncryptionBackendHandler < Tresor::Backend::BackendHa
     @http_parser.on_headers_complete = proc do |headers|
       @backend.plexer.relay_from_backend "HTTP/1.1 #{@http_parser.status_code}\r\n"
 
-      @encrypted_response = false
-
       headers.each do |header, value|
-        next if %w[Transfer-Encoding Content-Length].include? header
+        if %w[Transfer-Encoding Content-Length].include? header
+          @has_body = true
+
+          next
+        end
 
         if header.eql? 'Content-Encoding'
           @encrypted_response = value.eql? 'encrypted'
@@ -45,7 +47,9 @@ class Tresor::Backend::TCTPEncryptionBackendHandler < Tresor::Backend::BackendHa
         log.warn (log_key) {"Got unencrypted response from #{backend.host} (#{backend.connection_pool_key}) for encrypted request!"}
       end
 
-      @backend.plexer.relay_from_backend "Transfer-Encoding: chunked\r\n\r\n"
+      @backend.plexer.relay_from_backend "Transfer-Encoding: chunked\r\n" if @has_body
+
+      @backend.plexer.relay_from_backend "\r\n"
     end
 
     @first_chunk = true
@@ -64,8 +68,8 @@ class Tresor::Backend::TCTPEncryptionBackendHandler < Tresor::Backend::BackendHa
 
           @halec = @halec_promise.redeem_halec(body_halec_url)
 
-          @halec.on_encrypted_data_received = proc do |encrypted_data|
-            relay_as_chunked encrypted_data
+          @halec.on_decrypted_data_read = proc do |decrypted_data|
+            relay_as_chunked decrypted_data
           end
 
           @halec.decrypted_data_reads_finished.callback do
@@ -87,6 +91,10 @@ class Tresor::Backend::TCTPEncryptionBackendHandler < Tresor::Backend::BackendHa
 
     @http_parser.on_message_complete = proc do |env|
       log.debug (log_key) { "Finished receiving backend response to #{@backend.client_method} #{@backend.client_path}#{@backend.client_query_string ? "?#{@backend.client_query_string}": ''}." }
+
+      finish_response unless @encrypted_response
+
+      @http_parser.reset!
     end
 
     @backend.client_chunk_future.succeed self
@@ -107,11 +115,12 @@ class Tresor::Backend::TCTPEncryptionBackendHandler < Tresor::Backend::BackendHa
   def finish_response
     log.info (log_key) { 'Sending trailer to client' }
 
-    @backend.plexer.relay_from_backend "0\r\n\r\n"
+    @backend.plexer.relay_from_backend "0\r\n\r\n" if @has_body
 
-    @halec.reset if @encrypted_response
-
-    @halec_promise.return
+    if @encrypted_response
+      @halec.reset
+      @halec_promise.return
+    end
 
     @backend.free_backend
   end
@@ -123,6 +132,6 @@ class Tresor::Backend::TCTPEncryptionBackendHandler < Tresor::Backend::BackendHa
   end
 
   def log_key
-    'TCTP Encryption Handler'
+    "#{@backend.proxy.name} - TCTP Encrypt to Backend handler"
   end
 end

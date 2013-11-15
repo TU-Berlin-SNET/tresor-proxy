@@ -52,9 +52,9 @@ module Tresor
             b.host = host
             b.proxy = client_connection.proxy
           end
-          log.debug ('ConnectionPool') { "Created connection #{backend.__id__} to #{connection_key} (Host: #{host})" }
+          log.debug (log_key) { "Created connection #{backend.__id__} to #{connection_key} (Host: #{host})" }
         else
-          log.debug ('ConnectionPool') { "Reusing connection #{backend.__id__} to #{connection_key} (Host: #{host})" }
+          log.debug (log_key) { "Reusing connection #{backend.__id__} to #{connection_key} (Host: #{host})" }
         end
         backend.plexer = client_connection
 
@@ -70,6 +70,10 @@ module Tresor
 
     def backend_unbind(connection_pool_key, backend)
       @free_backends[connection_pool_key].delete(backend)
+    end
+
+    def log_key
+      "#{@proxy.name} - Connection pool"
     end
   end
 end

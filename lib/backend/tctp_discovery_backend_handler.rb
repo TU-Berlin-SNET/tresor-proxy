@@ -56,7 +56,7 @@ class Tresor::Backend::TCTPDiscoveryBackendHandler < Tresor::Backend::BackendHan
   end
 
   def log_key
-    'TCTP Discovery'
+    "#{@backend.proxy.name} - TCTP Discovery"
   end
 
   def self.finalize(id)

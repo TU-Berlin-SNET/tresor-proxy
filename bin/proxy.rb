@@ -20,14 +20,11 @@ end
 
 EventMachine.threadpool_size = opts[:threadpool] || 20
 
-logger = Logger.new(STDOUT)
-logger.level = Logger.const_get(opts[:loglevel] || 'INFO')
-
-Tresor::TresorProxy.class_variable_set(:@@logger, logger)
-
 proxy = Tresor::TresorProxy.new(opts[:ip] || '0.0.0.0', opts[:port] || '80')
 
-proxy.is_tctp_client = opts[:tctp_client]
+proxy.log.level = Logger.const_get(opts[:loglevel] || 'INFO')
+
+proxy.is_tctp_client = opts[:tctp_decryption_requested]
 proxy.is_tctp_server = opts[:tctp_server]
 
 if opts[:reverse_yaml]
