@@ -53,6 +53,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
     end
 
     @first_chunk = true
+    @message_complete = false
 
     @http_parser.on_body = proc do |chunk|
       if(@encrypted_response)
@@ -69,16 +70,22 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
           @halec = @halec_promise.redeem_halec(body_halec_url)
 
           @halec.on_decrypted_data_read = proc do |decrypted_data|
-            relay_as_chunked decrypted_data
-          end
+            unless decrypted_data.eql?(:finished)
+              relay_as_chunked decrypted_data
+            else
+              if @message_complete
+                finish_response
 
-          @halec.decrypted_data_reads_finished.callback do
-            finish_response
+                @http_parser.reset!
+              end
+            end
           end
 
           chunk_without_url = chunk[(first_newline_index + 2)..-1]
 
-          @halec.write_encrypted_data chunk_without_url
+          unless chunk_without_url.eql?('')
+            @halec.write_encrypted_data chunk_without_url
+          end
 
           @first_chunk = false
         else
@@ -94,7 +101,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
 
       finish_response unless @encrypted_response
 
-      @http_parser.reset!
+      @message_complete = true
     end
 
     @backend.client_chunk_future.succeed self

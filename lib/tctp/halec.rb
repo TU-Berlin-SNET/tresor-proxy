@@ -12,8 +12,6 @@ class Tresor::TCTP::HALEC
 
   attr_reader :encrypted_data_read_queue
 
-  attr_reader :decrypted_data_reads_finished
-
   attr_accessor :on_decrypted_data_read
   attr_accessor :on_encrypted_data_read
 
@@ -100,10 +98,10 @@ class Tresor::TCTP::HALEC
 
             @on_decrypted_data_read.call read_data
 
-            if(read_data.length < 2 ** 12)
+            if(read_data.length < 2 ** 12 && @socket_here.ready? == false)
               log.debug (log_key) { 'Decrypted data reads finished' }
 
-              @decrypted_data_reads_finished.succeed
+              @on_decrypted_data_read.call :finished
             end
           rescue IO::WaitReadable
             IO.select([@ssl_socket])

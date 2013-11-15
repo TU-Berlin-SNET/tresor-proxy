@@ -208,6 +208,20 @@ module Tresor
                 log.debug (log_key) { "Sending #{encrypted_data.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
 
                 send_data "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
+
+                if @relayed_completely && !@server_halec.socket_there.ready?
+                  log.debug (log_key) { 'Sent encrypted backend response to client.' }
+
+                  send_data "0\r\n\r\n" if @has_body
+
+                  proxy.halec_registry.halecs(:server)[@server_halec.url] = @server_halec
+
+                  @server_halec = nil
+                  @client_http_parser = nil
+                  @tctp_decryption_requested = nil
+
+                  @relayed_completely = false
+                end
               end
 
               send_data "Transfer-Encoding: chunked\r\n"
@@ -227,17 +241,7 @@ module Tresor
           end
 
           @client_http_parser.on_message_complete = proc do |headers|
-            sleep 5
-
-            log.debug (log_key) { 'Sent encrypted backend response to client.' }
-
-            send_data "0\r\n\r\n" if @has_body
-
-            proxy.halec_registry.halecs(:server)[@server_halec.url] = @server_halec
-
-            @server_halec = nil
-            @client_http_parser = nil
-            @tctp_decryption_requested = nil
+            @relayed_completely = true
           end
         end
 

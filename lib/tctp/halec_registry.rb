@@ -59,6 +59,8 @@ module Tresor
         def return
           @halec_registry.halecs(@handshake_url)[@promised_halec.url] = @promised_halec
 
+          @halec_registry.return_halec_promise(self)
+
           @promised_halec = nil
         end
       end

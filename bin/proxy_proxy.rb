@@ -7,13 +7,11 @@ local_proxy.is_tctp_client = true
 remote_proxy.is_tctp_server = true
 
 local_proxy.reverse_mappings = {
-    'youtube.local' => 'http://127.0.0.1:54321',
-    'tuberlin.local' => 'http://127.0.0.1:54321'
+    'app.local' => 'http://127.0.0.1:54321',
 }
 
 remote_proxy.reverse_mappings = {
-    'youtube.local' => 'http://www.youtube.com',
-    'tuberlin.local' => 'http://www.tu-berlin.de'
+    'app.local' => 'http://127.0.0.1:3000'
 }
 
 Thread.new do
