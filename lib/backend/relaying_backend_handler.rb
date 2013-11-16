@@ -37,7 +37,7 @@ module Tresor
       end
 
       def log_key
-        "#{@backend.proxy.name} - Relay Handler"
+        "Thread #{Thread.list.index(Thread.current)} - #{@backend.proxy.name} - Relay Handler"
       end
     end
   end

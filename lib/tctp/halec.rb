@@ -47,7 +47,7 @@ class Tresor::TCTP::HALEC
   end
 
   def log_key
-    "HALEC #{__id__} #{@url || 'Unknown URL'}"
+    "Thread #{Thread.list.index(Thread.current)} - HALEC #{__id__} #{@url || 'Unknown URL'}"
   end
 
   def log_state

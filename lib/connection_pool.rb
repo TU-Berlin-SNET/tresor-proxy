@@ -73,7 +73,7 @@ module Tresor
     end
 
     def log_key
-      "#{@proxy.name} - Connection pool"
+      "Thread #{Thread.list.index(Thread.current)} - #{@proxy.name} - Connection pool"
     end
   end
 end

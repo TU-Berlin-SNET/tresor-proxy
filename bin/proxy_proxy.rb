@@ -1,6 +1,6 @@
 require 'ruby-prof'
 
-TRACE = false
+TRACE = true
 
 require_relative '../lib/tresor_proxy'
 
@@ -18,8 +18,8 @@ remote_proxy.reverse_mappings = {
     'app.local' => 'http://127.0.0.1:3000'
 }
 
-local_proxy.log.level = Logger::WARN
-remote_proxy.log.level = Logger::WARN
+local_proxy.log.level = Logger::DEBUG
+remote_proxy.log.level = Logger::DEBUG
 
 RubyProf.start if TRACE
 

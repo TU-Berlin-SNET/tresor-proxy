@@ -267,7 +267,7 @@ module Tresor
     end
 
     def log_key
-      "#{@proxy.name} - Client #{@client_ip}:#{@client_port}"
+      "Thread #{Thread.list.index(Thread.current)} - #{@proxy.name} - Client #{@client_ip}:#{@client_port}"
     end
   end
 end

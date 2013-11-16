@@ -139,6 +139,6 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
   end
 
   def log_key
-    "#{@backend.proxy.name} - TCTP Encrypt to Backend handler"
+    "Thread #{Thread.list.index(Thread.current)} - #{@backend.proxy.name} - TCTP Encrypt to Backend handler"
   end
 end

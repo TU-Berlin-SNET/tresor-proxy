@@ -80,6 +80,6 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
   end
 
   def log_key
-    "#{@backend.proxy.name} - TCTP Handshake Handler"
+    "Thread #{Thread.list.index(Thread.current)} - #{@backend.proxy.name} - TCTP Handshake Handler"
   end
 end
