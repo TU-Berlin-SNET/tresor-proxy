@@ -131,17 +131,19 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
         @halec_decrypted_data.push decrypted_data, sequence_no
       end
 
-      @halec_decrypted_data.shift_next_items.each do |sequence_no, decrypted_data|
-        unless decrypted_data.eql?(:eof)
-          decrypted_data.each do |decrypted_data_item|
-            log.debug (log_key) { "Relaying #{decrypted_data_item.length} bytes decrypted data item from chunk ##{sequence_no} of #halec_decrypted_data queue." }
+      EventMachine::next_tick do
+        @halec_decrypted_data.shift_next_items.each do |sequence_no, decrypted_data|
+          unless decrypted_data.eql?(:eof)
+            decrypted_data.each do |decrypted_data_item|
+              log.debug (log_key) { "Relaying #{decrypted_data_item.length} bytes decrypted data item from chunk ##{sequence_no} of #halec_decrypted_data queue." }
 
-            relay_as_chunked decrypted_data_item
+              relay_as_chunked decrypted_data_item
+            end
+          else
+            log.debug (log_key) { "Got :eof as chunk ##{sequence_no} of #halec_decrypted_data queue, finishing response." }
+
+            finish_response
           end
-        else
-          log.debug (log_key) { "Got :eof as chunk ##{sequence_no} of #halec_decrypted_data queue, finishing response." }
-
-          finish_response
         end
       end
     end
@@ -177,6 +179,6 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
   end
 
   def log_key
-    "Thread #{Thread.list.index(Thread.current)} - #{@backend.proxy.name} - TCTP Encrypt to Backend handler"
+    "#{@backend.proxy.name} - TCTP Encrypt to Backend handler"
   end
 end

@@ -41,7 +41,7 @@ class Tresor::TCTP::HALEC
   end
 
   def log_key
-    "Thread #{Thread.list.index(Thread.current)} - HALEC #{__id__} #{@url || 'Unknown URL'}"
+    "HALEC #{__id__} #{@url || 'Unknown URL'}"
   end
 
   def log_state
@@ -111,8 +111,12 @@ class Tresor::TCTP::HALEC
 
               encrypted_items = []
 
-              while @socket_there.ready?
-                encrypted_items.push @socket_there.readpartial(32768)
+              begin
+                while true
+                  encrypted_items.push @socket_there.read_nonblock(32768)
+                end
+              rescue Exception => e
+
               end
 
               log.debug (log_key) { "Data to be encrypted: ##{sequence_no}" }

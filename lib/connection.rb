@@ -193,31 +193,33 @@ module Tresor
 
     def send_encrypted_data
       @server_halec.encrypt_data.callback do |encrypted_data_hash|
-        encrypted_data_hash.each do |sequence_no, encrypted_data|
-          @connection_encrypted_data_queue.push encrypted_data, sequence_no
-        end
+        unless @connection_encrypted_data_queue.nil? || @server_halec_encrypted_sequence_index.nil?
+          encrypted_data_hash.each do |sequence_no, encrypted_data|
+            @connection_encrypted_data_queue.push encrypted_data, sequence_no
+          end
 
-        @connection_encrypted_data_queue.shift_next_items.each do |sequence_no, encrypted_data|
-          unless encrypted_data.eql?(:eof)
-            encrypted_data.each do |data_part|
-              chunk_length_as_hex = data_part.length.to_s(16)
+          @connection_encrypted_data_queue.shift_next_items.each do |sequence_no, encrypted_data|
+            unless encrypted_data.eql?(:eof)
+              encrypted_data.each do |data_part|
+                chunk_length_as_hex = data_part.length.to_s(16)
 
-              log.debug (log_key) { "Sending #{data_part.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
+                log.debug (log_key) { "Sending #{data_part.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
 
-              send_data "#{chunk_length_as_hex}\r\n#{data_part}\r\n"
+                send_data "#{chunk_length_as_hex}\r\n#{data_part}\r\n"
+              end
+            else
+              log.debug (log_key) { 'Sent encrypted backend response to client.' }
+
+              send_data "0\r\n\r\n"
+
+              proxy.halec_registry.halecs(:server)[@server_halec.url] = @server_halec
+
+              @server_halec = nil
+              @client_http_parser = nil
+              @tctp_decryption_requested = nil
+              @server_halec_encrypted_sequence_index = nil
+              @connection_encrypted_data_queue = nil
             end
-          else
-            log.debug (log_key) { 'Sent encrypted backend response to client.' }
-
-            send_data "0\r\n\r\n"
-
-            proxy.halec_registry.halecs(:server)[@server_halec.url] = @server_halec
-
-            @server_halec = nil
-            @client_http_parser = nil
-            @tctp_decryption_requested = nil
-            @server_halec_encrypted_sequence_index = nil
-            @connection_encrypted_data_queue = nil
           end
         end
       end
@@ -327,7 +329,7 @@ module Tresor
     end
 
     def log_key
-      "Thread #{Thread.list.index(Thread.current)} - #{@proxy.name} - Client #{@client_ip}:#{@client_port}"
+      "#{@proxy.name} - Client #{@client_ip}:#{@client_port}"
     end
   end
 end

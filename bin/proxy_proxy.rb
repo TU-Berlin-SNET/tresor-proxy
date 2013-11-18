@@ -3,7 +3,7 @@ require 'eventmachine'
 
 EventMachine.threadpool_size = 100
 
-TRACE = true
+TRACE = false
 
 require_relative '../lib/tresor_proxy'
 
@@ -21,8 +21,11 @@ remote_proxy.reverse_mappings = {
     'app.local' => 'http://127.0.0.1:3000'
 }
 
-local_proxy.log.level = Logger::DEBUG
-remote_proxy.log.level = Logger::DEBUG
+#local_proxy.log.level = Logger::DEBUG
+#remote_proxy.log.level = Logger::DEBUG
+
+local_proxy.log.level = Logger::WARN
+remote_proxy.log.level = Logger::WARN
 
 RubyProf.start if TRACE
 
