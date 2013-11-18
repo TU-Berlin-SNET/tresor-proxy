@@ -30,8 +30,6 @@ class Tresor::TCTP::ServerHALEC < Tresor::TCTP::HALEC
       log.debug(log_key) {'SSL Socket connected.'}
 
       @halec_handshake_complete.succeed
-
-      begin_reading_decrypted_data
     end
   end
 

@@ -1,3 +1,5 @@
+require_relative 'sequence_queue'
+
 class Tresor::TCTP::HALEC
   attr_accessor :url
 
@@ -10,17 +12,23 @@ class Tresor::TCTP::HALEC
   # The encrypted socket
   attr_reader :socket_there
 
-  attr_reader :encrypted_data_read_queue
-
-  attr_accessor :on_decrypted_data_read
-  attr_accessor :on_encrypted_data_read
-
   # Callback, when the handshake is complete
   attr_reader :halec_handshake_complete
+
+  # Mutex for HALEC
+  attr_accessor :halec_mutex
+
+  # Queues. Items can either be a string, nil, or :eof
+  attr_accessor :data_to_be_encrypted
+  attr_accessor :data_to_be_decrypted
 
   def initialize(options = {})
     @url = options[:url] || ''
     @ctx = options[:ssl_context] || OpenSSL::SSL::SSLContext.new()
+    @halec_mutex = Mutex.new
+
+    @data_to_be_encrypted = Tresor::TCTP::SequenceQueue.new
+    @data_to_be_decrypted = Tresor::TCTP::SequenceQueue.new
 
     @ctx.ssl_version = :TLSv1
 
@@ -30,20 +38,6 @@ class Tresor::TCTP::HALEC
     end
 
     @halec_handshake_complete = EventMachine::DefaultDeferrable.new
-
-    reset
-  end
-
-  def reset
-    @on_decrypted_data_read = proc do |decrypted_data|
-      log.debug (log_key) { "No handler set for HALEC #on_decrypted_data_read. Discarding #{decrypted_data.size} bytes plaintext" }
-    end
-
-    @on_encrypted_data_read = proc do |encrpyted_data|
-      log.debug (log_key) { "No handler set for HALEC #on_encrypted_data_read. Discarding #{encrpyted_data.size} bytes encrypted data" }
-    end
-
-    @decrypted_data_reads_finished = EventMachine::DefaultDeferrable.new
   end
 
   def log_key
@@ -54,76 +48,80 @@ class Tresor::TCTP::HALEC
     log.debug(log_key) {"Current OpenSSL state: '#{@ssl_socket.state}'"}
   end
 
-  def write_encrypted_data(data)
-    result = @socket_there.write(data)
+  def decrypt_data
+    decrypted_data_callback = EventMachine::DefaultDeferrable.new
 
-    log.debug(log_key) {"Written #{result} of #{data.length} bytes to encrypted socket."}
-
-    log_state
-  end
-
-  def write_decrypted_data(data)
-    result = @ssl_socket.write(data)
-
-    log.debug (log_key) {"Written #{result} of #{data.length} bytes to SSL socket."}
-
-    log_state
-  end
-
-  def begin_reading_decrypted_data
     EM.defer do
-      begin
-        while true
-          begin
-            read_data = @ssl_socket.read_nonblock(2 ** 20)
+      decrypted_data = {}
 
-            log.debug (log_key) {"Read #{read_data.length} bytes plaintext from SSL socket."}
+      next_items = @data_to_be_decrypted.shift_next_items
 
-            log_state
+      unless next_items.empty?
+        @halec_mutex.synchronize do
+          next_items.each do |sequence_no, encrypted_data|
+            if encrypted_data.eql?(:eof)
+              decrypted_data[sequence_no] = :eof
 
-            @on_decrypted_data_read.call read_data
+              log.debug (log_key) { "##{sequence_no} was EOF"}
+            else
+              @socket_there.write(encrypted_data)
 
-            if(read_data.length < 2 ** 20 && @socket_here.ready? == false)
-              log.debug (log_key) { 'Decrypted data reads finished' }
+              decrypted_items = []
 
-              @on_decrypted_data_read.call :finished
+              while @socket_here.ready?
+                decrypted_items.push @ssl_socket.readpartial(32768)
+              end
+
+              log.debug (log_key) { "Decrypted ##{sequence_no}" }
+
+              decrypted_data[sequence_no] = decrypted_items
             end
-          rescue IO::WaitReadable
-            IO.select([@ssl_socket])
-            retry
-          rescue IO::WaitWritable
-            IO.select(nil, [@ssl_socket])
-            retry
           end
         end
-      rescue Exception => e
-        log.warn (log_key) {"Exception #{e}"}
       end
+
+      decrypted_data_callback.succeed decrypted_data
     end
+
+    decrypted_data_callback
   end
 
-  def begin_reading_encrypted_data
+  def encrypt_data
+    encrypted_data_callback = EventMachine::DefaultDeferrable.new
+
     EM.defer do
-      begin
-        while true
-          begin
-            read_data = @socket_there.read_nonblock(2 ** 24)
+      encrypted_data = {}
 
-            log.debug (log_key) {"Read #{read_data.length} bytes from encrypted socket."}
+      next_items = @data_to_be_encrypted.shift_next_items
 
-            log_state
+      unless next_items.empty?
+        @halec_mutex.synchronize do
+          next_items.each do |sequence_no, data|
+            if(data.eql?(:eof))
+              encrypted_data[sequence_no] = :eof
 
-            @on_encrypted_data_read.call read_data
-          rescue Errno::EWOULDBLOCK
-            IO.select([@socket_there])
+              log.debug (log_key) { "##{sequence_no} was EOF" }
+            else
+              @ssl_socket.write(data)
 
-            retry
+              encrypted_items = []
+
+              while @socket_there.ready?
+                encrypted_items.push @socket_there.readpartial(32768)
+              end
+
+              log.debug (log_key) { "Encrypted ##{sequence_no}" }
+
+              encrypted_data[sequence_no] = encrypted_items
+            end
           end
         end
-      rescue Exception => e
-        log.warn (log_key) {"Exception #{e}"}
       end
+
+      encrypted_data_callback.succeed encrypted_data
     end
+
+    encrypted_data_callback
   end
 
   private

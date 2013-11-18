@@ -26,51 +26,49 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
     @http_parser.on_body = proc do |chunk|
       log.debug (log_key) {"Got #{chunk.length} bytes handshake response in HTTP body"}
 
-      @halec.write_encrypted_data chunk
+      @halec.socket_there.write chunk
     end
 
     @http_parser.on_message_complete = proc do |env|
-      @halec.on_encrypted_data_read = proc do |handshake_response|
-        log.debug (log_key) { "POSTing #{handshake_response.length} bytes client handshake response to HALEC URL #{@halec.url}" }
+      handshake_response = @halec.socket_there.readpartial(16384)
 
-        @http_parser.reset!
-
-        @http_parser.on_message_complete = proc do
-          @halec.halec_handshake_complete.callback do
-            log.debug (log_key) { "TCTP Handshake complete. HALEC #{@halec.url} ready for encrypting data"}
-
-            @backend.proxy.halec_registry.register_halec @handshake_url, @halec
-
-            @backend.decide_handler
-          end
-        end
-
-        @backend.send_data "POST #{@halec.url} HTTP/1.1\r\n"
-        @backend.send_data "Host: #{@backend.host}\r\n"
-        @backend.send_data "Cookie: #{@cookie}\r\n" if @cookie
-        @backend.send_data "Content-Length: #{handshake_response.length}\r\n\r\n"
-
-        @backend.send_data handshake_response
-      end
-    end
-
-    @halec.on_encrypted_data_read = proc do |data|
-      @handshake_url = Tresor::TCTP.handshake_url(@backend.host, @backend.client_path)
+      log.debug (log_key) { "POSTing #{handshake_response.length} bytes client handshake response to HALEC URL #{@halec.url}" }
 
       @http_parser.reset!
 
-      @backend.send_data "POST #{@handshake_url} HTTP/1.1\r\n"
+      @http_parser.on_message_complete = proc do
+        @halec.halec_handshake_complete.callback do
+          log.debug (log_key) { "TCTP Handshake complete. HALEC #{@halec.url} ready for encrypting data"}
+
+          @backend.proxy.halec_registry.register_halec @handshake_url, @halec
+
+          @backend.decide_handler
+        end
+      end
+
+      @backend.send_data "POST #{@halec.url} HTTP/1.1\r\n"
       @backend.send_data "Host: #{@backend.host}\r\n"
       @backend.send_data "Cookie: #{@cookie}\r\n" if @cookie
-      @backend.send_data "Content-Length: #{data.length}\r\n\r\n"
-      @backend.send_data data
+      @backend.send_data "Content-Length: #{handshake_response.length}\r\n\r\n"
 
-      log.debug (log_key) {"POSTed #{data.length} bytes client_hello to #{@handshake_url} of host #{@backend.host}"}
+      @backend.send_data handshake_response
     end
 
-    @backend.receive_data_future.succeed self
+    client_hello = @halec.socket_there.readpartial(16384)
 
-    @halec.begin_reading_encrypted_data
+    @handshake_url = Tresor::TCTP.handshake_url(@backend.host, @backend.client_path)
+
+    @http_parser.reset!
+
+    @backend.send_data "POST #{@handshake_url} HTTP/1.1\r\n"
+    @backend.send_data "Host: #{@backend.host}\r\n"
+    @backend.send_data "Cookie: #{@cookie}\r\n" if @cookie
+    @backend.send_data "Content-Length: #{client_hello.length}\r\n\r\n"
+    @backend.send_data client_hello
+
+    log.debug (log_key) {"POSTed #{client_hello.length} bytes client_hello to #{@handshake_url} of host #{@backend.host}"}
+
+    @backend.receive_data_future.succeed self
   end
 
   def receive_data(data)

@@ -33,12 +33,11 @@ module Tresor
           trap("TERM") { stop }
           trap("INT")  { stop }
 
-          EM.error_handler do |e|
+          EventMachine.error_handler do |e|
             log.warn { "Error in event loop callback: #{e} #{e.message}" }
-            log.warn { e.backtrace }
           end
 
-          EventMachine::start_server(@host, @port, Tresor::Connection, self)
+          server = EventMachine::start_server(@host, @port, Tresor::Connection, self)
 
           log.info { "#{@name} started on #{@host}:#{@port}" }
 
