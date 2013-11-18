@@ -30,6 +30,8 @@ class Tresor::TCTP::SequenceQueue
   end
 
   def push(item, number)
-    sequence[number] = item
+    sequence_mutex.synchronize do
+      sequence[number] = item
+    end
   end
 end

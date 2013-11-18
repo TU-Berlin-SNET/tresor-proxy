@@ -24,7 +24,7 @@ class Tresor::TCTP::ServerHALEC < Tresor::TCTP::HALEC
 
     @ssl_socket = OpenSSL::SSL::SSLSocket.new(@socket_here, @ctx)
 
-    EM.defer do
+    Thread.new do
       @ssl_socket.accept
 
       log.debug(log_key) {'SSL Socket connected.'}

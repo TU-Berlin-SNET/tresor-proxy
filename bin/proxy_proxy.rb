@@ -1,4 +1,7 @@
 require 'ruby-prof'
+require 'eventmachine'
+
+EventMachine.threadpool_size = 100
 
 TRACE = true
 

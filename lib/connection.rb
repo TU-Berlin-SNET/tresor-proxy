@@ -107,6 +107,8 @@ module Tresor
             close_connection_after_writing
           end
 
+          @has_request_body = false
+
           @http_parser.on_body = proc do |chunk|
             @has_request_body = true
 
@@ -282,13 +284,17 @@ module Tresor
 
           # Encrypt each part of backend body
           @client_http_parser.on_body = proc do |chunk|
+            log.debug (log_key) { "Pushing chunk ##{@server_halec_encrypted_sequence_index} to #data_to_be_encrypted queue." }
+
             @server_halec.data_to_be_encrypted.push chunk, @server_halec_encrypted_sequence_index
             @server_halec_encrypted_sequence_index += 1
 
             send_encrypted_data
           end
 
-          @client_http_parser.on_message_complete = proc do |headers|
+          @client_http_parser.on_message_complete = proc do
+            log.debug (log_key) { "Pushing :eof as chunk ##{@server_halec_encrypted_sequence_index} to #data_to_be_encrypted queue." }
+
             @server_halec.data_to_be_encrypted.push :eof, @server_halec_encrypted_sequence_index
             @server_halec_encrypted_sequence_index += 1
 

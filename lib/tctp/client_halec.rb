@@ -11,7 +11,7 @@ module Tresor
 
         @ssl_socket = OpenSSL::SSL::SSLSocket.new(@socket_here, @ctx)
 
-        EM.defer do
+        Thread.new do
           @ssl_socket.connect
 
           log.debug(log_key) {'SSL Socket connected.'}

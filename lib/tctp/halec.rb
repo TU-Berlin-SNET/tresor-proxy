@@ -62,17 +62,22 @@ class Tresor::TCTP::HALEC
             if encrypted_data.eql?(:eof)
               decrypted_data[sequence_no] = :eof
 
-              log.debug (log_key) { "##{sequence_no} was EOF"}
+              log.debug (log_key) { "Data to be decrypted: ##{sequence_no} was :eof"}
             else
               @socket_there.write(encrypted_data)
 
               decrypted_items = []
 
-              while @socket_here.ready?
-                decrypted_items.push @ssl_socket.readpartial(32768)
+              #If badly chunked, we do not have any data
+              begin
+                while true
+                  decrypted_items.push @ssl_socket.read_nonblock(32768)
+                end
+              rescue Exception => e
+
               end
 
-              log.debug (log_key) { "Decrypted ##{sequence_no}" }
+              log.debug (log_key) { "Data to be decrypted: decrypted ##{sequence_no}" }
 
               decrypted_data[sequence_no] = decrypted_items
             end
@@ -100,7 +105,7 @@ class Tresor::TCTP::HALEC
             if(data.eql?(:eof))
               encrypted_data[sequence_no] = :eof
 
-              log.debug (log_key) { "##{sequence_no} was EOF" }
+              log.debug (log_key) { "Data to be encrypted: ##{sequence_no} was EOF" }
             else
               @ssl_socket.write(data)
 
@@ -110,7 +115,7 @@ class Tresor::TCTP::HALEC
                 encrypted_items.push @socket_there.readpartial(32768)
               end
 
-              log.debug (log_key) { "Encrypted ##{sequence_no}" }
+              log.debug (log_key) { "Data to be encrypted: ##{sequence_no}" }
 
               encrypted_data[sequence_no] = encrypted_items
             end
