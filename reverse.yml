@@ -1,3 +1,4 @@
 ---
 'google.local': 'http://www.google.com'
 'app.local': 'http://127.0.0.1:3000'
+'openshift.local': 'http://ruby-tctp.rhcloud.com'

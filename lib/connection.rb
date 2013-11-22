@@ -172,6 +172,8 @@ module Tresor
     def receive_data(data)
       log.debug (log_key) {"Received #{data.size} bytes from client."}
 
+      puts "\r\n#{data}" if proxy.output_raw_data
+
       @http_parser << data
     end
 
@@ -326,6 +328,12 @@ module Tresor
       send_data "Content-Type: #{DISCOVERY_MEDIA_TYPE}\r\n"
       send_data "Content-Length: #{DISCOVERY_INFORMATION.length}\r\n\r\n"
       send_data DISCOVERY_INFORMATION
+    end
+
+    def send_data(data)
+      puts "\r\n#{data}" if proxy.output_raw_data
+
+      super(data)
     end
 
     def log_key

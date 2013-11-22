@@ -16,6 +16,7 @@ opts = Slop.parse do
   on 'c', 'tctp_client', 'Enable TCTP client forwarding proxy'
   on 'r', 'tctp_server', 'Enable TCTP server reverse proxy'
   on 'y=', 'reverse_yaml', 'Load reverse proxy settings from YAML file'
+  on 'x', 'raw_output', 'Output RAW data on console'
 end
 
 EventMachine.threadpool_size = opts[:threadpool] || 20
@@ -24,8 +25,9 @@ proxy = Tresor::TresorProxy.new(opts[:ip] || '0.0.0.0', opts[:port] || '80')
 
 proxy.log.level = Logger.const_get(opts[:loglevel] || 'INFO')
 
-proxy.is_tctp_client = opts[:tctp_decryption_requested]
+proxy.is_tctp_client = opts[:tctp_client]
 proxy.is_tctp_server = opts[:tctp_server]
+proxy.output_raw_data = opts[:raw_output]
 
 if opts[:reverse_yaml]
   mappings = YAML::load_file(File.join(Dir.pwd, opts[:reverse_yaml]))

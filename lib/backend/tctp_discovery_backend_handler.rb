@@ -43,7 +43,7 @@ class Tresor::Backend::TCTPDiscoveryBackendHandler < Tresor::Backend::BackendHan
       @tctp_discovery_information = nil
     end
 
-    @backend.send_data "OPTIONS * HTTP/1.1\r\n"
+    @backend.send_data "OPTIONS /* HTTP/1.1\r\n"
     @backend.send_data "Host: #{@backend.host}\r\n"
     @backend.send_data "Accept: text/prs.tctp-discovery\r\n"
     @backend.send_data "\r\n"

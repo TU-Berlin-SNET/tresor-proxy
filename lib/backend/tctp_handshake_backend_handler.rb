@@ -49,7 +49,8 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
       @backend.send_data "POST #{@halec.url} HTTP/1.1\r\n"
       @backend.send_data "Host: #{@backend.host}\r\n"
       @backend.send_data "Cookie: #{@cookie}\r\n" if @cookie
-      @backend.send_data "Content-Length: #{handshake_response.length}\r\n\r\n"
+      @backend.send_data "Content-Length: #{handshake_response.length}\r\n"
+      @backend.send_data "Content-Type: application/octet-stream\r\n\r\n"
 
       @backend.send_data handshake_response
     end
@@ -64,6 +65,7 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
     @backend.send_data "Host: #{@backend.host}\r\n"
     @backend.send_data "Cookie: #{@cookie}\r\n" if @cookie
     @backend.send_data "Content-Length: #{client_hello.length}\r\n\r\n"
+    @backend.send_data "Content-Type: application/octet-stream\r\n\r\n"
     @backend.send_data client_hello
 
     log.debug (log_key) {"POSTed #{client_hello.length} bytes client_hello to #{@handshake_url} of host #{@backend.host}"}

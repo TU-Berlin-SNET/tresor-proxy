@@ -3,6 +3,12 @@ require 'eventmachine'
 
 EventMachine.threadpool_size = 100
 
+def trace_output(data)
+  File.open('trace.bin', 'a') do |f|
+    f << data
+  end
+end
+
 TRACE = false
 
 require_relative '../lib/tresor_proxy'

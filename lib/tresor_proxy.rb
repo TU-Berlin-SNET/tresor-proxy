@@ -13,6 +13,7 @@ module Tresor
 
     attr_accessor :is_tctp_client
     attr_accessor :is_tctp_server
+    attr_accessor :output_raw_data
     attr_accessor :reverse_mappings
     attr_accessor :connection_pool
     attr_accessor :halec_registry
