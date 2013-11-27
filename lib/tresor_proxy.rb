@@ -36,19 +36,15 @@ module Tresor
 
           EventMachine.error_handler do |e|
             log.warn { "Error in event loop callback: #{e} #{e.message}" }
+
+            e.backtrace.each do |bt|
+              log.warn bt
+            end
           end
 
           server = EventMachine::start_server(@host, @port, Tresor::Connection, self)
 
           log.info { "#{@name} started on #{@host}:#{@port}" }
-
-          #if(log.level == Logger::DEBUG)
-          #  EventMachine.add_periodic_timer(5) do
-          #    free_connections_number = Tresor::ConnectionPool.instance_variable_get(:@free_backends).values.collect{|v| v.size}.reduce :+
-          #
-          #    log.debug ('ConnectionPool') {"#{free_connections_number} reusable connections."}
-          #  end
-          #end
         end
       rescue Exception => e
         log.fatal { "Error in TRESOR Proxy: #{e}" }

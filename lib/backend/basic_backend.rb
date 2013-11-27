@@ -35,7 +35,7 @@ module Tresor
       def receive_data(data)
         log.debug (log_key) { "Received #{data.size} bytes from backend" }
 
-        puts "\r\n#{data}" if proxy.output_raw_data
+        print "#{data}" if proxy.output_raw_data
 
         @receive_data_future.callback do |backend_handler|
           backend_handler.receive_data data

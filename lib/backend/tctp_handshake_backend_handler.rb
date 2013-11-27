@@ -64,7 +64,7 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
     @backend.send_data "POST #{@handshake_url} HTTP/1.1\r\n"
     @backend.send_data "Host: #{@backend.host}\r\n"
     @backend.send_data "Cookie: #{@cookie}\r\n" if @cookie
-    @backend.send_data "Content-Length: #{client_hello.length}\r\n\r\n"
+    @backend.send_data "Content-Length: #{client_hello.length}\r\n"
     @backend.send_data "Content-Type: application/octet-stream\r\n\r\n"
     @backend.send_data client_hello
 

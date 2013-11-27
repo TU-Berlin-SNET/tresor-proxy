@@ -22,6 +22,11 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
         tctp_cookie_sent = true
       end
 
+      # Send Host header of reverse URL
+      if header.eql? 'Host'
+        value = @backend.host
+      end
+
       @backend.send_data "#{header}: #{value}\r\n"
     end
     @backend.send_data "Cookie: #{cookie}\r\n" unless tctp_cookie_sent
@@ -46,7 +51,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
       end
 
       unless @encrypted_response
-        log.warn (log_key) {"Got unencrypted response from #{backend.host} (#{backend.connection_pool_key}) for encrypted request!"}
+        log.warn (log_key) {"Got unencrypted response from #{backend.host} (#{backend.connection_pool_key}) for encrypted request #{build_start_line}!"}
       end
 
       @backend.plexer.relay_from_backend "Transfer-Encoding: chunked\r\n" if @has_body
@@ -72,18 +77,6 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
           @halec = @halec_promise.redeem_halec(body_halec_url)
           @halec_data_index = @halec.data_to_be_decrypted.sequence_index
           @halec_decrypted_data = Tresor::TCTP::SequenceQueue.new(@halec_data_index)
-
-          #@halec.on_decrypted_data_read = proc do |decrypted_data|
-          #  unless decrypted_data.eql?(:finished)
-          #    relay_as_chunked decrypted_data
-          #  else
-          #    if @message_complete
-          #      finish_response
-          #
-          #      @http_parser.reset!
-          #    end
-          #  end
-          #end
 
           chunk_without_url = chunk[(first_newline_index + 2)..-1]
 
@@ -115,10 +108,14 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
 
       log.debug (log_key) { "Pushing :eof chunk ##{@halec_data_index} to data_to_be_decrypted queue." }
 
-      @halec.data_to_be_decrypted.push :eof, @halec_data_index
-      @halec_data_index += 1
+      if @encrypted_response
+        @halec.data_to_be_decrypted.push :eof, @halec_data_index
+        @halec_data_index += 1
 
-      send_decrypted_data
+        send_decrypted_data
+      else
+        @backend.plexer.relay_from_backend "0\r\n\r\n"
+      end
     end
 
     @backend.client_chunk_future.succeed self
