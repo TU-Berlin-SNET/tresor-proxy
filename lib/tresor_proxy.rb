@@ -18,6 +18,25 @@ module Tresor
     attr_accessor :connection_pool
     attr_accessor :halec_registry
     attr_accessor :name
+    attr_accessor :started
+
+    ##
+    # Callback for when the proxy is started.
+    #
+    # Contains a block, which sets +started+ to +true+.
+    #
+    # @!attribute [r] start_callback
+    # @return [EventMachine::DefaultDeferrable]
+    attr :start_callback
+
+    ##
+    # Callback for when the proxy is stopped.
+    #
+    # Contains a block, which sets +started+ to +false+.
+    #
+    # @!attribute [r] start_callback
+    # @return [EventMachine::DefaultDeferrable]
+    attr :stop_callback
 
     def initialize(host, port, name = "TRESOR Proxy")
       @host = host
@@ -25,6 +44,17 @@ module Tresor
       @name = name
       @connection_pool = ConnectionPool.new(self)
       @halec_registry = TCTP::HALECRegistry.new
+      @reverse_mappings = {}
+
+      @start_callback = EventMachine::DefaultDeferrable.new
+      @start_callback.callback do
+        @started = true
+      end
+
+      @stop_callback = EventMachine::DefaultDeferrable.new
+      @stop_callback.callback do
+        @started = false
+      end
     end
 
     def start
@@ -45,6 +75,8 @@ module Tresor
           server = EventMachine::start_server(@host, @port, Tresor::Connection, self)
 
           log.info { "#{@name} started on #{@host}:#{@port}" }
+
+          start_callback.succeed
         end
       rescue Exception => e
         log.fatal { "Error in TRESOR Proxy: #{e}" }
@@ -55,6 +87,8 @@ module Tresor
     def stop
       log.info { "Terminating ProxyServer" }
       EventMachine.stop
+
+      @stop_callback.succeed
     end
 
     def log
