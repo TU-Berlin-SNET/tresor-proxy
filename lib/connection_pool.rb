@@ -14,22 +14,22 @@ module Tresor
       @free_backends = {}
     end
 
-    def get_backend_future_for_forward_url(url, client_connection)
+    def get_backend_future_for_forward_url(url, client_connection, &block)
       uri = URI.parse(url)
 
       ipInt = Socket.gethostbyname(uri.host)[3]
       ip =  "%d.%d.%d.%d" % [ipInt[0].ord, ipInt[1].ord, ipInt[2].ord, ipInt[3].ord]
 
-      get_backend_future_for_host(ip, uri.port, uri.host, client_connection)
+      get_backend_future_for_host(ip, uri.port, uri.host, client_connection, &block)
     end
 
-    def get_backend_future_for_reverse_host(host, client_connection)
+    def get_backend_future_for_reverse_host(host, client_connection, &block)
       requested_host = host.partition(':').first
 
       reverse_host = @proxy.reverse_mappings[requested_host]
 
       if reverse_host
-        get_backend_future_for_forward_url(reverse_host, client_connection)
+        get_backend_future_for_forward_url(reverse_host, client_connection, &block)
       else
         backend_future = EventMachine::DefaultDeferrable.new
         backend_future.fail "This proxy is not configured to reverse proxy #{requested_host}"
@@ -37,7 +37,7 @@ module Tresor
       end
     end
 
-    def get_backend_future_for_host(ip, port, host, client_connection)
+    def get_backend_future_for_host(ip, port, host, client_connection, &block)
       backend_future = EventMachine::DefaultDeferrable.new
 
       connection_key = "#{ip}:#{port}"
@@ -57,6 +57,8 @@ module Tresor
           log.debug (log_key) { "Reusing connection #{backend.__id__} to #{connection_key} (Host: #{host})" }
         end
         backend.plexer = client_connection
+
+        block.call backend
 
         backend_future.succeed backend
       end

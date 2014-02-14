@@ -73,12 +73,23 @@ module Tresor
           end
         else
           #Regular proxy functionality
+
+          #Build initialization function, which is called when the backend is created
+          send_client_request = proc do |backend|
+            parsed_uri = URI.parse(@http_parser.request_url)
+
+            parsed_uri.path = '/' if parsed_uri.path.eql?('')
+
+            # Inform Backend about the current client request
+            backend.client_request @http_parser.http_method, parsed_uri.path, parsed_uri.query, @http_parser.headers
+          end
+
           if @http_parser.request_url.start_with?('http')
             # Forward proxy
-            @backend_future = proxy.connection_pool.get_backend_future_for_forward_url(@http_parser.request_url, self)
+            @backend_future = proxy.connection_pool.get_backend_future_for_forward_url(@http_parser.request_url, self, &send_client_request)
           else
             # Reverse proxy
-            @backend_future = proxy.connection_pool.get_backend_future_for_reverse_host(@http_parser.headers['Host'], self)
+            @backend_future = proxy.connection_pool.get_backend_future_for_reverse_host(@http_parser.headers['Host'], self, &send_client_request)
           end
 
           # Strip TCTP encryption information from request as we are decrypting it
@@ -93,14 +104,6 @@ module Tresor
             @tctp_decryption_requested = false
           end
 
-          #As soon as the backend is ready...
-          @backend_future.callback do |backend|
-            parsed_uri = URI.parse(@http_parser.request_url)
-
-            # Inform Backend about the current client request
-            backend.client_request @http_parser.http_method, parsed_uri.path, parsed_uri.query, @http_parser.headers
-          end
-
           @backend_future.errback do |error|
             send_error_response(error)
 
@@ -108,55 +111,55 @@ module Tresor
           end
 
           @has_request_body = false
+        end
+      end
 
-          @http_parser.on_body = proc do |chunk|
-            @has_request_body = true
+      @http_parser.on_body = proc do |chunk|
+        @has_request_body = true
 
-            @backend_future.callback do |backend|
-              if @tctp_decryption_requested
-                # Get the server HALEC url from the incoming client connection and set @server_halec to decide
-                # when relaying, to either use the same HALEC (in case of HTTP bodies), or any HALEC (in case of body-
-                # less HTTP requests)
-                unless @server_halec
-                  first_newline_index = chunk.index("\r\n")
-                  body_halec_url = chunk[0, first_newline_index]
+        @backend_future.callback do |backend|
+          if @tctp_decryption_requested
+            # Get the server HALEC url from the incoming client connection and set @server_halec to decide
+            # when relaying, to either use the same HALEC (in case of HTTP bodies), or any HALEC (in case of body-
+            # less HTTP requests)
+            unless @server_halec
+              first_newline_index = chunk.index("\r\n")
+              body_halec_url = chunk[0, first_newline_index]
 
-                  log.debug (log_key) { "Body was encrypted using HALEC #{body_halec_url}" }
+              log.debug (log_key) { "Body was encrypted using HALEC #{body_halec_url}" }
 
-                  @server_halec = proxy.halec_registry.halecs(:server)[body_halec_url]
-                  @server_halec_sequence_index = @server_halec.data_to_be_decrypted.sequence_index
-                  @connection_decrypted_data_queue = Tresor::TCTP::SequenceQueue.new(@server_halec_sequence_index)
+              @server_halec = proxy.halec_registry.halecs(:server)[body_halec_url]
+              @server_halec_sequence_index = @server_halec.data_to_be_decrypted.sequence_index
+              @connection_decrypted_data_queue = Tresor::TCTP::SequenceQueue.new(@server_halec_sequence_index)
 
-                  chunk_without_url = chunk[(first_newline_index + 2)..-1]
+              chunk_without_url = chunk[(first_newline_index + 2)..-1]
 
-                  @server_halec.data_to_be_decrypted.push chunk_without_url, @server_halec_sequence_index
-                  @server_halec_sequence_index += 1
+              @server_halec.data_to_be_decrypted.push chunk_without_url, @server_halec_sequence_index
+              @server_halec_sequence_index += 1
 
-                  send_decrypted_data
-                else
-                  @server_halec.data_to_be_decrypted.push chunk, @server_halec_sequence_index
-                  @server_halec_sequence_index += 1
+              send_decrypted_data
+            else
+              @server_halec.data_to_be_decrypted.push chunk, @server_halec_sequence_index
+              @server_halec_sequence_index += 1
 
-                  send_decrypted_data
-                end
-              else
-                backend.client_chunk chunk
-              end
+              send_decrypted_data
             end
+          else
+            backend.client_chunk chunk
           end
+        end
+      end
 
-          @http_parser.on_message_complete = proc do |env|
-            if @has_request_body
-              @backend_future.callback do |backend|
-                if @tctp_decryption_requested
-                  @server_halec.data_to_be_decrypted.push :eof, @server_halec_sequence_index
-                  @server_halec_sequence_index += 1
+      @http_parser.on_message_complete = proc do |env|
+        if @has_request_body
+          @backend_future.callback do |backend|
+            if @tctp_decryption_requested
+              @server_halec.data_to_be_decrypted.push :eof, @server_halec_sequence_index
+              @server_halec_sequence_index += 1
 
-                  send_decrypted_data
-                else
-                  send_client_trailer_chunk
-                end
-              end
+              send_decrypted_data
+            else
+              send_client_trailer_chunk if @http_parser.headers['Transfer-Encoding'].eql? 'chunked'
             end
           end
         end
@@ -239,7 +242,7 @@ module Tresor
 
     def send_client_trailer_chunk
       @backend_future.callback do |backend|
-        @backend.client_chunk "0\r\n\r\n"
+        backend.client_chunk "0\r\n\r\n"
       end
     end
 
