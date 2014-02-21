@@ -2,6 +2,8 @@ require_relative 'connection'
 require_relative 'logging'
 require_relative 'connection_pool'
 
+require 'fiber'
+require 'em-synchrony'
 require 'logger'
 
 module Tresor
@@ -11,10 +13,27 @@ module Tresor
     attr :host
     attr :port
 
+    # Does this proxy encrypt messages upstream?
+    #
+    # !@attr [rw] is_tctp_client
+    # @return [Boolean] Does this proxy encrypt messages upstream?
     attr_accessor :is_tctp_client
+
+    # Does this proxy decrypt incoming messages?
+    #
+    # !@attr [rw] is_tctp_server
+    # @return [Boolean] Does this proxy decrypt incoming messages?
     attr_accessor :is_tctp_server
+
     attr_accessor :output_raw_data
+
+    # Mapping from URLs to reverse hosts, e.g. `{'google.local' => 'http://www.google.com'}`
+    #
+    # !@attr [rw] reverse_mappings
+    # @return [Hash{String => String}] Mappings for reverse hosts.
     attr_accessor :reverse_mappings
+
+
     attr_accessor :connection_pool
     attr_accessor :halec_registry
     attr_accessor :name
@@ -60,7 +79,7 @@ module Tresor
     def start
       begin
         EM.epoll
-        EM.run do
+        EM.synchrony do
           trap("TERM") { stop }
           trap("INT")  { stop }
 
@@ -72,7 +91,9 @@ module Tresor
             end
           end
 
-          server = EventMachine::start_server(@host, @port, Tresor::Connection, self)
+          Fiber.new do
+            EventMachine::start_server(@host, @port, Tresor::Connection, self)
+          end.resume
 
           log.info { "#{@name} started on #{@host}:#{@port}" }
 

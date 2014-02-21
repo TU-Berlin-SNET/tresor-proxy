@@ -1,5 +1,7 @@
 require_relative 'sequence_queue'
 
+require 'fiber'
+
 class Tresor::TCTP::HALEC
   attr_accessor :url
 
@@ -18,17 +20,10 @@ class Tresor::TCTP::HALEC
   # Mutex for HALEC
   attr_accessor :halec_mutex
 
-  # Queues. Items can either be a string, nil, or :eof
-  attr_accessor :data_to_be_encrypted
-  attr_accessor :data_to_be_decrypted
-
   def initialize(options = {})
-    @url = options[:url] || ''
+    @url = options[:url] || nil
     @ctx = options[:ssl_context] || OpenSSL::SSL::SSLContext.new()
     @halec_mutex = Mutex.new
-
-    @data_to_be_encrypted = Tresor::TCTP::SequenceQueue.new
-    @data_to_be_decrypted = Tresor::TCTP::SequenceQueue.new
 
     @ctx.ssl_version = :TLSv1
 
@@ -48,89 +43,43 @@ class Tresor::TCTP::HALEC
     log.debug(log_key) {"Current OpenSSL state: '#{@ssl_socket.state}'"}
   end
 
-  def decrypt_data
-    decrypted_data_callback = EventMachine::DefaultDeferrable.new
+  # Decrypts encrypted data
+  # @param data [String] The encrypted data
+  # @return [String] The decrypted data
+  def decrypt_data(data)
+    @socket_there.write(data)
 
-    EM.defer do
-      decrypted_data = {}
+    decrypted_items = []
 
-      next_items = @data_to_be_decrypted.shift_next_items
-
-      unless next_items.empty?
-        @halec_mutex.synchronize do
-          next_items.each do |sequence_no, encrypted_data|
-            if encrypted_data.eql?(:eof)
-              decrypted_data[sequence_no] = :eof
-
-              log.debug (log_key) { "Data to be decrypted: ##{sequence_no} was :eof"}
-            else
-              @socket_there.write(encrypted_data)
-
-              decrypted_items = []
-
-              #If badly chunked, we do not have any data
-              begin
-                while true
-                  decrypted_items.push @ssl_socket.read_nonblock(32768)
-                end
-              rescue Exception => e
-
-              end
-
-              log.debug (log_key) { "Data to be decrypted: decrypted ##{sequence_no}" }
-
-              decrypted_data[sequence_no] = decrypted_items
-            end
-          end
-        end
+    #If badly chunked, we do not have any data
+    begin
+      while true
+        decrypted_items.push @ssl_socket.read_nonblock(32768)
       end
-
-      decrypted_data_callback.succeed decrypted_data
+    rescue Exception => e
+      unless @ssl_socket.state =~ /SSLOK/
+        log.error (log_key) { "Error while decrypting data: #{e}" }
+      end
     end
 
-    decrypted_data_callback
+    exit if decrypted_items.empty?
+
+    decrypted_items.join
   end
 
-  def encrypt_data
-    encrypted_data_callback = EventMachine::DefaultDeferrable.new
+  # Encrypts plaintext
+  # @param data [String] The plaintext
+  # @return [String] The encrypted data
+  def encrypt_data(data)
+    @ssl_socket.write(data)
 
-    EM.defer do
-      encrypted_data = {}
+    encrypted_items = []
 
-      next_items = @data_to_be_encrypted.shift_next_items
-
-      unless next_items.empty?
-        @halec_mutex.synchronize do
-          next_items.each do |sequence_no, data|
-            if(data.eql?(:eof))
-              encrypted_data[sequence_no] = :eof
-
-              log.debug (log_key) { "Data to be encrypted: ##{sequence_no} was EOF" }
-            else
-              @ssl_socket.write(data)
-
-              encrypted_items = []
-
-              begin
-                while true
-                  encrypted_items.push @socket_there.read_nonblock(32768)
-                end
-              rescue Exception => e
-
-              end
-
-              log.debug (log_key) { "Data to be encrypted: ##{sequence_no}" }
-
-              encrypted_data[sequence_no] = encrypted_items
-            end
-          end
-        end
-      end
-
-      encrypted_data_callback.succeed encrypted_data
+    while @socket_there.ready?
+      encrypted_items.push @socket_there.readpartial(32768)
     end
 
-    encrypted_data_callback
+    encrypted_items.join
   end
 
   private

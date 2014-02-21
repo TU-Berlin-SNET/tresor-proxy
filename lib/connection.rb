@@ -22,6 +22,10 @@ module Tresor
     def initialize(proxy)
       @proxy = proxy
 
+      reset_http_parser
+    end
+
+    def reset_http_parser
       @http_parser = HTTP::Parser.new
 
       # Create backend as soon as all headers are complete
@@ -43,21 +47,26 @@ module Tresor
           end
 
           @http_parser.on_message_complete = proc do
-            halec_url = "/halecs/#{Tresor::TCTP::ServerHALEC.new_slug}"
+            halec_url = URI("http://#{@proxy.host}:#{@proxy.port}/halecs/#{Tresor::TCTP::ServerHALEC.new_slug}")
 
             handshake_response = @server_halec.socket_there.readpartial(16384)
             send_data "HTTP/1.1 200 OK\r\n"
-            send_data "Location: #{halec_url}\r\n"
+            send_data "Location: #{halec_url.to_s}\r\n"
             send_data "Content-Length: #{handshake_response.length}\r\n\r\n"
             send_data handshake_response
 
             @server_halec.url = halec_url
 
             proxy.halec_registry.register_halec(:server, @server_halec)
+
+            log.debug(log_key) {"Registered server HALEC #{@server_halec.url}"}
           end
         elsif proxy.is_tctp_server && @http_parser.http_method.eql?('POST') && @http_parser.request_url.start_with?('/halecs/')
+          # Get HALEC URL
+          halec_url = URI("http://#{@proxy.host}:#{@proxy.port}#{@http_parser.request_url}")
+
           # TCTP handshake
-          @server_halec = proxy.halec_registry.halecs(:server)[@http_parser.request_url]
+          @server_halec = proxy.halec_registry.halecs(:server)[halec_url]
 
           @http_parser.on_body = proc do |chunk|
             @server_halec.socket_there.write chunk
@@ -128,21 +137,15 @@ module Tresor
 
               log.debug (log_key) { "Body was encrypted using HALEC #{body_halec_url}" }
 
-              @server_halec = proxy.halec_registry.halecs(:server)[body_halec_url]
-              @server_halec_sequence_index = @server_halec.data_to_be_decrypted.sequence_index
-              @connection_decrypted_data_queue = Tresor::TCTP::SequenceQueue.new(@server_halec_sequence_index)
+              @server_halec = proxy.halec_registry.halecs(:server)[URI(body_halec_url)]
 
               chunk_without_url = chunk[(first_newline_index + 2)..-1]
 
-              @server_halec.data_to_be_decrypted.push chunk_without_url, @server_halec_sequence_index
-              @server_halec_sequence_index += 1
-
-              send_decrypted_data
+              unless chunk_without_url.eql? ''
+                send_decrypted_data chunk_without_url
+              end
             else
-              @server_halec.data_to_be_decrypted.push chunk, @server_halec_sequence_index
-              @server_halec_sequence_index += 1
-
-              send_decrypted_data
+              send_decrypted_data chunk
             end
           else
             backend.client_chunk chunk
@@ -154,12 +157,15 @@ module Tresor
         if @has_request_body
           @backend_future.callback do |backend|
             if @tctp_decryption_requested
-              @server_halec.data_to_be_decrypted.push :eof, @server_halec_sequence_index
-              @server_halec_sequence_index += 1
+              log.debug (log_key) { 'Sent encrypted backend response to client.' }
 
-              send_decrypted_data
+              backend.client_chunk "0\r\n\r\n" if @http_parser.headers['Transfer-Encoding'].eql? 'chunked'
+
+              proxy.halec_registry.halecs(:server)[@server_halec.url] = @server_halec
+
+              @server_halec = nil
             else
-              send_client_trailer_chunk if @http_parser.headers['Transfer-Encoding'].eql? 'chunked'
+              send_client_trailer_chunk if @http_parser.headers['Transfer-Encoding'].eql?('chunked') || backend.backend_handler.is_a?(Tresor::Backend::TCTPEncryptToBackendHandler)
             end
           end
         end
@@ -180,54 +186,20 @@ module Tresor
       @http_parser << data
     end
 
-    def send_decrypted_data
-      @server_halec.decrypt_data.callback do |decrypted_data_hash|
-        decrypted_data_hash.each do |sequence_no, decrypted_data|
-          @connection_decrypted_data_queue.push decrypted_data, sequence_no
-        end
-
-        @connection_decrypted_data_queue.shift_next_items.each do |sequence_no, decrypted_data|
-          unless decrypted_data.eql?(:eof)
-            send_as_chunked decrypted_data
-          else
-            send_client_trailer_chunk
-          end
-        end
-      end
+    # Decrypts +chunk+ and sends it to the client
+    def send_decrypted_data(chunk)
+      send_as_chunked @server_halec.decrypt_data(chunk)
     end
 
-    def send_encrypted_data
-      @server_halec.encrypt_data.callback do |encrypted_data_hash|
-        unless @connection_encrypted_data_queue.nil? || @server_halec_encrypted_sequence_index.nil?
-          encrypted_data_hash.each do |sequence_no, encrypted_data|
-            @connection_encrypted_data_queue.push encrypted_data, sequence_no
-          end
+    # Encrypts +chunk+ and sends it to the client
+    def send_encrypted_data(chunk)
+      encrypted_data = @server_halec.encrypt_data chunk
 
-          @connection_encrypted_data_queue.shift_next_items.each do |sequence_no, encrypted_data|
-            unless encrypted_data.eql?(:eof)
-              encrypted_data.each do |data_part|
-                chunk_length_as_hex = data_part.length.to_s(16)
+      chunk_length_as_hex = encrypted_data.length.to_s(16)
 
-                log.debug (log_key) { "Sending #{data_part.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
+      log.debug (log_key) { "Sending #{encrypted_data.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
 
-                send_data "#{chunk_length_as_hex}\r\n#{data_part}\r\n"
-              end
-            else
-              log.debug (log_key) { 'Sent encrypted backend response to client.' }
-
-              send_data "0\r\n\r\n"
-
-              proxy.halec_registry.halecs(:server)[@server_halec.url] = @server_halec
-
-              @server_halec = nil
-              @client_http_parser = nil
-              @tctp_decryption_requested = nil
-              @server_halec_encrypted_sequence_index = nil
-              @connection_encrypted_data_queue = nil
-            end
-          end
-        end
-      end
+      send_data "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
     end
 
     def send_as_chunked(decrypted_data)
@@ -236,7 +208,7 @@ module Tresor
 
         log.debug (log_key) { "Sending #{decrypted_data.length} (#{chunk_length_as_hex}) bytes of decrypted data from client to backend" }
 
-        @backend.client_chunk "#{chunk_length_as_hex}\r\n#{decrypted_data}\r\n"
+        backend.client_chunk "#{chunk_length_as_hex}\r\n#{decrypted_data}\r\n"
       end
     end
 
@@ -249,14 +221,9 @@ module Tresor
     def relay_from_backend(data)
       log.debug (log_key) {"Received #{data.size} bytes from backend."}
 
-      unless @tctp_decryption_requested
-        log.debug (log_key) {"Relaying #{data.size} bytes directly to client."}
-        send_data data
-      else
+      if @tctp_decryption_requested
         # Use either the same HALEC used for sending an HTTP body, or any free HALEC
         @server_halec ||= proxy.halec_registry.halecs(:server).shift[1]
-        @server_halec_encrypted_sequence_index ||= @server_halec.data_to_be_encrypted.sequence_index
-        @connection_encrypted_data_queue ||= Tresor::TCTP::SequenceQueue.new(@server_halec_encrypted_sequence_index)
 
         # Need to parse backend response to filter out headers
         unless @client_http_parser
@@ -281,7 +248,7 @@ module Tresor
               send_data "Transfer-Encoding: chunked\r\n"
               send_data "Content-Encoding: encrypted\r\n\r\n"
 
-              server_halec_url_plus_line_break_length_as_hex = (@server_halec.url.length + 2).to_s(16)
+              server_halec_url_plus_line_break_length_as_hex = (@server_halec.url.to_s.length + 2).to_s(16)
 
               send_data "#{server_halec_url_plus_line_break_length_as_hex}\r\n#{@server_halec.url}\r\n"
             end
@@ -291,27 +258,39 @@ module Tresor
 
           # Encrypt each part of backend body
           @client_http_parser.on_body = proc do |chunk|
-            log.debug (log_key) { "Pushing chunk ##{@server_halec_encrypted_sequence_index} to #data_to_be_encrypted queue." }
-
-            @server_halec.data_to_be_encrypted.push chunk, @server_halec_encrypted_sequence_index
-            @server_halec_encrypted_sequence_index += 1
-
-            send_encrypted_data
+            send_encrypted_data chunk
           end
 
+          # If the backend response is complete, return the HALEC
           @client_http_parser.on_message_complete = proc do
-            log.debug (log_key) { "Pushing :eof as chunk ##{@server_halec_encrypted_sequence_index} to #data_to_be_encrypted queue." }
+            send_data "0\r\n\r\n"
 
-            @server_halec.data_to_be_encrypted.push :eof, @server_halec_encrypted_sequence_index
-            @server_halec_encrypted_sequence_index += 1
+            proxy.halec_registry.register_halec(:server, @server_halec)
 
-            send_encrypted_data
+            @server_halec = nil
+            @client_http_parser = nil
+            @tctp_decryption_requested = nil
+
+            reset_http_parser
           end
         end
 
         log.debug (log_key) {"Sending #{data.size} bytes to HTTP parser to be encrypted to client."}
 
         @client_http_parser << data
+      else
+        log.debug (log_key) {"Relaying #{data.size} bytes directly to client."}
+        send_data data
+
+        unless @client_http_parser
+          @client_http_parser = HTTP::Parser.new
+
+          @client_http_parser.on_message_complete = proc do
+            @client_http_parser = nil
+
+            reset_http_parser
+          end
+        end
       end
     end
 

@@ -1,6 +1,10 @@
 require_relative '../tctp/sequence_queue'
 
 class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHandler
+
+  # Initializes the Handler to encrypt to the +backend+ using the +halec_promise+ promise.
+  # @param backend [Tresor::Backend::BasicBackend] The backend
+  # @param halec_promise [Tresor::TCTP::HALECRegistry::HALECPromise] The promise
   def initialize(backend, halec_promise)
     @backend = backend
     @halec_promise = halec_promise
@@ -16,7 +20,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
 
     @backend.send_data start_line
     @backend.client_headers.each do |header, value|
-      next if header.eql?('Accept-Encoding')
+      next if header.eql?('Accept-Encoding') || header.eql?('Content-Length')
       if header.eql?('Cookie') && cookie
         value = "#{value}; #{cookie}"
         tctp_cookie_sent = true
@@ -29,6 +33,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
 
       @backend.send_data "#{header}: #{value}\r\n"
     end
+    @backend.send_data "Transfer-Encoding: chunked\r\nContent-Encoding: encrypted\r\n" if @backend.client_headers.has_key? 'Content-Length'
     @backend.send_data "Cookie: #{cookie}\r\n" unless tctp_cookie_sent
     @backend.send_data 'Accept-Encoding: encrypted'
     @backend.send_data "\r\n\r\n"
@@ -74,29 +79,17 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
 
           log.debug (log_key) { "Body was encrypted using HALEC #{body_halec_url}" }
 
-          @halec = @halec_promise.redeem_halec(body_halec_url)
-          @halec_data_index = @halec.data_to_be_decrypted.sequence_index
-          @halec_decrypted_data = Tresor::TCTP::SequenceQueue.new(@halec_data_index)
+          @halec = @halec_promise.redeem_halec(URI(body_halec_url))
 
           chunk_without_url = chunk[(first_newline_index + 2)..-1]
 
           unless chunk_without_url.eql?('')
-            log.debug (log_key) { "Pushing #{chunk_without_url.size} bytes chunk ##{@halec_data_index} to data_to_be_decrypted queue." }
-
-            @halec.data_to_be_decrypted.push chunk_without_url, @halec_data_index
-            @halec_data_index += 1
-
-            send_decrypted_data
+            relay_as_chunked @halec.decrypt_data(chunk_without_url)
           end
 
           @first_chunk = false
         else
-          log.debug (log_key) { "Pushing #{chunk.size} bytes chunk ##{@halec_data_index} to data_to_be_decrypted queue." }
-
-          @halec.data_to_be_decrypted.push chunk, @halec_data_index
-          @halec_data_index += 1
-
-          send_decrypted_data
+          relay_as_chunked @halec.decrypt_data(chunk)
         end
       else
         relay_as_chunked(chunk)
@@ -106,43 +99,16 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
     @http_parser.on_message_complete = proc do |env|
       log.debug (log_key) { "Finished receiving backend response to #{@backend.client_method} #{@backend.client_path}#{@backend.client_query_string ? "?#{@backend.client_query_string}": ''}." }
 
-      log.debug (log_key) { "Pushing :eof chunk ##{@halec_data_index} to data_to_be_decrypted queue." }
-
       if @encrypted_response
-        @halec.data_to_be_decrypted.push :eof, @halec_data_index
-        @halec_data_index += 1
-
-        send_decrypted_data
+        finish_response
       else
         @backend.plexer.relay_from_backend "0\r\n\r\n"
       end
     end
 
-    @backend.client_chunk_future.succeed self
-    @backend.receive_data_future.succeed self
-  end
-
-  def send_decrypted_data
-    @halec.decrypt_data.callback do |decrypted_data_hash|
-      decrypted_data_hash.each do |sequence_no, decrypted_data|
-        @halec_decrypted_data.push decrypted_data, sequence_no
-      end
-
-      EventMachine::next_tick do
-        @halec_decrypted_data.shift_next_items.each do |sequence_no, decrypted_data|
-          unless decrypted_data.eql?(:eof)
-            decrypted_data.each do |decrypted_data_item|
-              log.debug (log_key) { "Relaying #{decrypted_data_item.length} bytes decrypted data item from chunk ##{sequence_no} of #halec_decrypted_data queue." }
-
-              relay_as_chunked decrypted_data_item
-            end
-          else
-            log.debug (log_key) { "Got :eof as chunk ##{sequence_no} of #halec_decrypted_data queue, finishing response." }
-
-            finish_response
-          end
-        end
-      end
+    EM.schedule do
+      @backend.client_chunk_future.succeed self
+      @backend.receive_data_future.succeed self
     end
   end
 
@@ -169,10 +135,46 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
     @backend.free_backend
   end
 
+  def client_chunk(data)
+    if data[-5,5].eql? "0\r\n\r\n"
+      @backend.send_data "0\r\n\r\n"
+
+      @halec_promise.return
+    else
+      log.debug (log_key) { "Encrypting #{data.length} bytes to backend." }
+
+      unless @halec
+        @halec = @halec_promise.redeem_halec
+
+        @halec_url_line = "#{@halec.url}\r\n"
+
+        chunk_length_as_hex = @halec_url_line.length.to_s(16)
+        chunk = "#{chunk_length_as_hex}\r\n#{@halec_url_line}\r\n"
+
+        @backend.send_data chunk
+      end
+
+      encrypted_data = @halec.encrypt_data data
+
+      chunk_length_as_hex = encrypted_data.length.to_s(16)
+
+      log.debug (log_key) { "Sending #{encrypted_data.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
+
+      chunk = "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
+
+      @backend.send_data chunk
+    end
+  end
+
   def receive_data(data)
     log.debug (log_key) { "Feeding #{data.length} bytes of encrypted data to HTTP parser" }
 
-    @http_parser << data
+    begin
+      @http_parser << data
+    rescue Exception => e
+      puts e
+      puts data
+    end
   end
 
   def log_key

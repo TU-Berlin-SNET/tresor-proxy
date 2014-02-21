@@ -10,7 +10,7 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
     @http_parser = HTTP::Parser.new
     @http_parser.on_headers_complete = proc do |headers|
       if headers['Location']
-        @halec.url = headers['Location']
+        @halec.url = URI(headers['Location'])
         log.debug (log_key) {"Got new HALEC url: #{@halec.url}"}
       end
 
@@ -46,7 +46,7 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
         end
       end
 
-      @backend.send_data "POST #{@halec.url} HTTP/1.1\r\n"
+      @backend.send_data "POST #{@halec.url.path} HTTP/1.1\r\n"
       @backend.send_data "Host: #{@backend.host}\r\n"
       @backend.send_data "Cookie: #{@cookie}\r\n" if @cookie
       @backend.send_data "Content-Length: #{handshake_response.length}\r\n"

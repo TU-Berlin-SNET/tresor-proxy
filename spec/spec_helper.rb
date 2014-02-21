@@ -2,6 +2,8 @@ require 'rspec'
 
 require 'simplecov'
 
+require 'support/shared_proxy_spec'
+
 # spec_helper.rb
 RSpec.configure do |config|
   # Disable 'should' for consistency

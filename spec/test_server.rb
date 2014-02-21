@@ -14,18 +14,16 @@ module Tresor
 
           input_string = input.string
 
-          puts current_post_body[0..20]
-          puts current_post_body.length
-          puts input_string[0..20]
-          puts input_string.length
+          IO.write('expected', current_post_body)
+          IO.write('actual', input_string)
 
           if current_post_body.eql? input_string
-            [ 200, {'Content-Type' => 'text/plain', 'Content-Length' => "#{input_string.length}"}, input_string]
+            [ 200, {'Content-Type' => 'text/plain', 'Content-Length' => "#{input_string.length}"}, [input_string]]
           else
-            [ 500, {'Content-Type' => 'text/plain', 'Content-Length' => '30'}, 'Did not receive correct string']
+            [ 500, {'Content-Type' => 'text/plain', 'Content-Length' => '30'}, ['Did not receive correct string']]
           end
         else
-          [ 200, {'Content-Type' => 'text/plain', 'Content-Length' => '7'}, 'Success']
+          [ 200, {'Content-Type' => 'text/plain', 'Content-Length' => '7'}, ['Success']]
       end
     end
   end

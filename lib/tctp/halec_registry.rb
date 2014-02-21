@@ -7,6 +7,10 @@ module Tresor
         @tctp_cookies = {}
       end
 
+      def empty?
+        @halecs.empty?
+      end
+
       def promise_for(host, resource_url)
         handshake_url = Tresor::TCTP.handshake_url(host, resource_url)
 
@@ -48,12 +52,18 @@ module Tresor
           @halec_registry = halec_registry
         end
 
+        # Redeems a HALEC promise.
+        #
+        # @param halec_url [URI] If specified, redeems the HALEC with the specified URL, or else redeems any available HALEC.
+        # @return [Tresor::TCTP::HALEC] An HALEC
         def redeem_halec(halec_url = nil)
           if halec_url
             @promised_halec = @halec_registry.halecs(@handshake_url)[halec_url]
           else
             @promised_halec = @halec_registry.halec_for(@host, @handshake_url)
           end
+
+          @promised_halec
         end
 
         def return

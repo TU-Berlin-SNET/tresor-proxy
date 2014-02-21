@@ -60,7 +60,9 @@ module Tresor
 
         block.call backend
 
-        backend_future.succeed backend
+        EM.schedule do
+          backend_future.succeed backend
+        end
       end
 
       backend_future
