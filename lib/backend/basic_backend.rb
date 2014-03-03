@@ -104,7 +104,7 @@ module Tresor
       end
 
       def log_key
-        "#{proxy.name} - Backend #{@connection_pool_key} #{@host}"
+        "#{proxy.name} - Backend #{@connection_pool_key} #{@host} - Thread #{Thread.current.__id__}"
       end
 
       def send_data(data)

@@ -1,11 +1,12 @@
 require_relative '../tctp/tctp'
-require_relative '../tctp/client_halec'
+
+require 'rack/tctp/halec'
 
 class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHandler
   def initialize(backend)
     @backend = backend
 
-    @halec = Tresor::TCTP::ClientHALEC.new
+    @halec = Rack::TCTP::ClientHALEC.new
 
     @http_parser = HTTP::Parser.new
     @http_parser.on_headers_complete = proc do |headers|
@@ -26,24 +27,23 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
     @http_parser.on_body = proc do |chunk|
       log.debug (log_key) {"Got #{chunk.length} bytes handshake response in HTTP body"}
 
-      @halec.socket_there.write chunk
+      @halec.engine.inject chunk
     end
 
     @http_parser.on_message_complete = proc do |env|
-      handshake_response = @halec.socket_there.readpartial(16384)
+      @halec.engine.read
+      handshake_response = @halec.engine.extract
 
       log.debug (log_key) { "POSTing #{handshake_response.length} bytes client handshake response to HALEC URL #{@halec.url}" }
 
       @http_parser.reset!
 
       @http_parser.on_message_complete = proc do
-        @halec.halec_handshake_complete.callback do
-          log.debug (log_key) { "TCTP Handshake complete. HALEC #{@halec.url} ready for encrypting data"}
+        log.debug (log_key) { "TCTP Handshake complete. HALEC #{@halec.url} ready for encrypting data"}
 
-          @backend.proxy.halec_registry.register_halec @handshake_url, @halec
+        @backend.proxy.halec_registry.register_halec @handshake_url, @halec
 
-          @backend.decide_handler
-        end
+        @backend.decide_handler
       end
 
       @backend.send_data "POST #{@halec.url.path} HTTP/1.1\r\n"
@@ -55,7 +55,8 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
       @backend.send_data handshake_response
     end
 
-    client_hello = @halec.socket_there.readpartial(16384)
+    @halec.engine.read
+    client_hello = @halec.engine.extract
 
     @handshake_url = Tresor::TCTP.handshake_url(@backend.host, @backend.client_path)
 

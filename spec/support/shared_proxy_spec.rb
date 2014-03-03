@@ -13,7 +13,11 @@ shared_examples 'a TRESOR proxy' do
     http = Net::HTTP.new(proxy_uri.host, proxy_uri.port)
     request = Net::HTTP::Get.new(request_uri)
 
-    response = http.request request
+    begin
+      response = http.request request
+    rescue Exception => e
+      fail
+    end
 
     expect(response.code).to eq '200'
     expect(response.body).to eq 'Success'
@@ -39,6 +43,7 @@ shared_examples 'a TRESOR proxy' do
     response = http.request request
 
     expect(response.code).to eq '200'
+    expect(response.body.length).to eq test_body_string.length
     expect(response.body).to eq test_body_string
 
     after_post_expectation.call

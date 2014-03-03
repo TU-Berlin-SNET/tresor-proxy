@@ -1,7 +1,7 @@
 require 'http_parser'
 require_relative 'connection_pool'
-require_relative 'tctp/server_halec'
-require_relative 'tctp/sequence_queue'
+
+require 'rack/tctp/halec'
 
 module Tresor
   ##
@@ -40,16 +40,17 @@ module Tresor
           send_tctp_discovery_information
         elsif proxy.is_tctp_server && @http_parser.http_method.eql?('POST') && @http_parser.request_url.eql?('/halecs')
           # TCTP HALEC creation
-          @server_halec = Tresor::TCTP::ServerHALEC.new
+          @server_halec = Rack::TCTP::ServerHALEC.new
 
           @http_parser.on_body = proc do |chunk|
-            @server_halec.socket_there.write chunk
+            @server_halec.engine.inject chunk
           end
 
           @http_parser.on_message_complete = proc do
-            halec_url = URI("http://#{@proxy.host}:#{@proxy.port}/halecs/#{Tresor::TCTP::ServerHALEC.new_slug}")
+            halec_url = URI("http://#{@proxy.host}:#{@proxy.port}/halecs/#{Rack::TCTP::ServerHALEC.new_slug}")
 
-            handshake_response = @server_halec.socket_there.readpartial(16384)
+            @server_halec.engine.read
+            handshake_response = @server_halec.engine.extract
             send_data "HTTP/1.1 200 OK\r\n"
             send_data "Location: #{halec_url.to_s}\r\n"
             send_data "Content-Length: #{handshake_response.length}\r\n\r\n"
@@ -69,9 +70,11 @@ module Tresor
           @server_halec = proxy.halec_registry.halecs(:server)[halec_url]
 
           @http_parser.on_body = proc do |chunk|
-            @server_halec.socket_there.write chunk
+            @server_halec.engine.inject chunk
 
-            handshake_response = @server_halec.socket_there.readpartial(16384)
+            @server_halec.engine.read
+
+            handshake_response = @server_halec.engine.extract
             send_data "HTTP/1.1 200 OK\r\n"
             send_data "Content-Length: #{handshake_response.length}\r\n\r\n"
             send_data handshake_response
@@ -142,10 +145,10 @@ module Tresor
               chunk_without_url = chunk[(first_newline_index + 2)..-1]
 
               unless chunk_without_url.eql? ''
-                send_decrypted_data chunk_without_url
+                send_decrypted_data backend, chunk_without_url
               end
             else
-              send_decrypted_data chunk
+              send_decrypted_data backend, chunk
             end
           else
             backend.client_chunk chunk
@@ -187,8 +190,8 @@ module Tresor
     end
 
     # Decrypts +chunk+ and sends it to the client
-    def send_decrypted_data(chunk)
-      send_as_chunked @server_halec.decrypt_data(chunk)
+    def send_decrypted_data(backend, chunk)
+      send_as_chunked backend, @server_halec.decrypt_data(chunk)
     end
 
     # Encrypts +chunk+ and sends it to the client
@@ -202,8 +205,8 @@ module Tresor
       send_data "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
     end
 
-    def send_as_chunked(decrypted_data)
-      @backend_future.callback do |backend|
+    def send_as_chunked(backend, decrypted_data)
+      unless decrypted_data.length == 0
         chunk_length_as_hex = decrypted_data.length.to_s(16)
 
         log.debug (log_key) { "Sending #{decrypted_data.length} (#{chunk_length_as_hex}) bytes of decrypted data from client to backend" }
@@ -319,7 +322,7 @@ module Tresor
     end
 
     def log_key
-      "#{@proxy.name} - Client #{@client_ip}:#{@client_port}"
+      "#{@proxy.name} - Client #{@client_ip}:#{@client_port} - Thread #{Thread.current.__id__}"
     end
   end
 end

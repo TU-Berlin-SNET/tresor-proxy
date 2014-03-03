@@ -10,6 +10,8 @@ require 'webrick'
 
 describe 'A set of tctp proxies' do
   before(:all) do
+    puts "Before a set of tctp proxies"
+
     @first_proxy = Tresor::TresorProxy.new '127.0.0.1', '43210', 'First TCTP proxy'
     @second_proxy = Tresor::TresorProxy.new '127.0.0.1', '43211', 'Second TCTP proxy'
 
@@ -20,11 +22,11 @@ describe 'A set of tctp proxies' do
 
     @test_server = Tresor::TestServer.new
 
-    TEST_SERVER = Tresor::TestServer.new
-    @test_server = TEST_SERVER
+    PROXY_SET_TEST_SERVER = Tresor::TestServer.new
+    @test_server = PROXY_SET_TEST_SERVER
 
     @rack_stack = Rack::Builder.new do
-      run TEST_SERVER
+      run PROXY_SET_TEST_SERVER
     end
 
     @webrick_server = WEBrick::HTTPServer.new({:BindAddress => '127.0.0.1', :Port => 43212})
@@ -34,20 +36,26 @@ describe 'A set of tctp proxies' do
     Thread.new do @second_proxy.start end
     Thread.new do @webrick_server.start end
 
-    until @first_proxy.started do end
-    until @second_proxy.started do end
+    until @first_proxy.started do Thread.pass end
+    until @second_proxy.started do Thread.pass end
+    until @webrick_server.status.eql? :Running do Thread.pass end
   end
 
   after(:all) do
-    @proxy.stop
-    @thin_server.stop
+    @first_proxy.stop
+    @second_proxy.stop
+    @webrick_server.stop
+
+    while @first_proxy.started do Thread.pass end
+    while @second_proxy.started do Thread.pass end
+    until @webrick_server.status.eql? :Stop do Thread.pass end
   end
 
-  let :proxy_uri do
+  def proxy_uri
     URI.parse('http://127.0.0.1:43210')
   end
 
-  let :request_uri do
+  def request_uri
     'http://127.0.0.1:43211'
   end
 
@@ -68,7 +76,7 @@ describe 'A set of tctp proxies' do
     end
   end
 
-  it 'ignores bad halec URL' do
-    pending
-  end
+  #it 'ignores bad halec URL' do
+  #  pending
+  #end
 end

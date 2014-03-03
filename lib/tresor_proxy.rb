@@ -91,9 +91,7 @@ module Tresor
             end
           end
 
-          Fiber.new do
-            EventMachine::start_server(@host, @port, Tresor::Connection, self)
-          end.resume
+          EventMachine::start_server(@host, @port, Tresor::Connection, self)
 
           log.info { "#{@name} started on #{@host}:#{@port}" }
 
@@ -114,6 +112,12 @@ module Tresor
 
     def log
       @@logger
+    end
+
+    class << self
+      def logger
+        @@logger
+      end
     end
   end
 end

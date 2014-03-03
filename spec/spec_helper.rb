@@ -2,7 +2,7 @@ require 'rspec'
 
 require 'simplecov'
 
-require 'support/shared_proxy_spec'
+#require_relative 'support/shared_proxy_spec'
 
 # spec_helper.rb
 RSpec.configure do |config|

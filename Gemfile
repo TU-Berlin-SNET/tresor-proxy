@@ -1,6 +1,5 @@
 source 'https://rubygems.org'
 
-gem 'radix'
 gem 'eventmachine', '~> 1.0.3'
 gem 'em-synchrony'
 gem 'http_parser.rb', '0.6.0.beta.2'
@@ -13,3 +12,4 @@ gem 'rspec'
 gem 'simplecov'
 gem 'thin'
 gem 'faker'
+gem 'fuubar'

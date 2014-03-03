@@ -11,50 +11,47 @@ require 'rack-tctp'
 
 describe 'A tctp server proxy' do
   before(:all) do
-    @proxy = Tresor::TresorProxy.new '127.0.0.1', '43210', 'TCTP server proxy'
+    @proxy = Tresor::TresorProxy.new '127.0.0.1', '43215', 'TCTP server proxy'
 
     @proxy.is_tctp_server = true
-    @proxy.reverse_mappings = { '127.0.0.1' => 'http://127.0.0.1:43211' }
+    @proxy.reverse_mappings = { '127.0.0.1' => 'http://127.0.0.1:43216' }
 
-    TEST_SERVER = Tresor::TestServer.new
-    @test_server = TEST_SERVER
+    SERVER_PROXY_TEST_SERVER = Tresor::TestServer.new
+    @test_server = SERVER_PROXY_TEST_SERVER
 
     @rack_stack = Rack::Builder.new do
-      run TEST_SERVER
+      run SERVER_PROXY_TEST_SERVER
     end
 
-    @webrick_server = WEBrick::HTTPServer.new({:BindAddress => '127.0.0.1', :Port => 43211})
+    @webrick_server = WEBrick::HTTPServer.new({:BindAddress => '127.0.0.1', :Port => 43216})
     @webrick_server.mount '/', Rack::Handler::WEBrick, @rack_stack.to_app
 
     Thread.new do @proxy.start end
     Thread.new do @webrick_server.start end
 
-    until @proxy.started do end
+    until @proxy.started do Thread.pass end
+    until @webrick_server.status.eql? :Running do Thread.pass end
   end
 
   after(:all) do
+    puts "After tctp server proxy"
+
     @proxy.stop
-    @thin_server.stop
+    @webrick_server.stop
+
+    while @proxy.started do Thread.pass end
+    until @webrick_server.status.eql? :Stop do Thread.pass end
   end
 
   it 'can be used to issue forward GET and POST request' do
-    client_halec = ClientHALEC.new()
-
-    # Connect sends out the handshake, but would block until handshake is completed. Therefore the connect is run in
-    # another thread.
-    Thread.new {
-      begin
-        client_halec.ssl_socket.connect
-      rescue Exception => e
-        puts e
-      end
-    }
+    client_halec = Rack::TCTP::ClientHALEC.new()
 
     # Receive the TLS client_hello
-    client_hello = client_halec.socket_there.recv(1024)
+    client_halec.engine.read
+    client_hello = client_halec.engine.extract
 
     # Post the client_hello to the HALEC creation URI, starting the handshake
-    http = Net::HTTP.new('127.0.0.1', '43210')
+    http = Net::HTTP.new('127.0.0.1', '43215')
     request = Net::HTTP::Post.new('/halecs')
     request.body = client_hello
 
@@ -66,10 +63,11 @@ describe 'A tctp server proxy' do
     halec_url = response['Location']
 
     # Feed the handshake response (server_hello, certificate, etc.) from the entity-body to the client HALEC
-    client_halec.socket_there.write(response.body)
+    client_halec.engine.inject response.body
 
     # Read the TLS client response (client_key_exchange, change_cipher_spec, finished)
-    client_response = client_halec.socket_there.recv(2048)
+    client_halec.engine.read
+    client_response = client_halec.engine.extract
 
     # Post the TLS client response to the HALEC url
     request = Net::HTTP::Post.new(URI(halec_url).path)
@@ -80,7 +78,7 @@ describe 'A tctp server proxy' do
     expect(response.code).to eq '200'
 
     # Feed the handshake response (change_cipher_spec, finished) to the client HALEC
-    client_halec.socket_there.write(response.body)
+    client_halec.engine.inject response.body
 
     # The handshake is now complete!
 
@@ -97,18 +95,14 @@ describe 'A tctp server proxy' do
 
     expect(url.chomp).to eql(halec_url)
 
-    # Write the rest of the stream to the client HALEC
-    body_encrypted = body_stream.readpartial(1024*1024)
-    client_halec.socket_there.write(body_encrypted)
-
     # Read the decrypted body
-    decrypted_body = client_halec.ssl_socket.readpartial(1024*1024)
+    decrypted_body = client_halec.decrypt_data body_stream.read
 
     expect(decrypted_body).to eql('Success')
 
     # Creates a POST body
     plaintext_test_body = StringIO.new
-    (1..10000).each do |x|
+    (1..1000000).each do |x|
       plaintext_test_body.write "#{x}:"
     end
 
@@ -120,20 +114,13 @@ describe 'A tctp server proxy' do
     encrypted_body_io.write "#{halec_url}\r\n"
 
     # Encrypts plaintext_test_body
-    to_write = test_body_string.bytesize
-    written = 0
-    until written == to_write
-      written += client_halec.ssl_socket.write_nonblock(test_body_string[written, to_write])
-      encrypted_test_body_string = client_halec.socket_there.read_nonblock(1024*1024)
-      encrypted_body_io.write(encrypted_test_body_string)
-    end
+    encrypted_body_io.write client_halec.encrypt_data(test_body_string)
 
     request = Net::HTTP::Post.new('/')
     request.body = encrypted_body_io.string
     request['Accept-Encoding'] = 'encrypted'
     request['Content-Encoding'] = 'encrypted'
 
-    # Mock Accept-Encoding 'encrypted'
     response = http.request request
 
     # Create a stream from the response body
@@ -145,21 +132,9 @@ describe 'A tctp server proxy' do
     expect(url.chomp).to eql(halec_url)
 
     # Write the rest of the stream to the client HALEC
-    body_encrypted = body_stream.read
-    client_halec.socket_there.write(body_encrypted)
-    client_halec.socket_there.close
-
-    # Read the decrypted body
-    decrypted_body = StringIO.new
-    until @allread
-      begin
-        decrypted_body.write client_halec.ssl_socket.readpartial(1024*1024)
-      rescue Exception => e
-        @allread = true
-      end
-    end
+    decrypted_body = client_halec.decrypt_data(body_stream.read)
 
     # Compares the response
-    expect(decrypted_body.string).to eql(test_body_string)
+    expect(decrypted_body).to eql(test_body_string)
   end
 end

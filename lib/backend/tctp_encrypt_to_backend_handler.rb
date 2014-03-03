@@ -1,4 +1,4 @@
-require_relative '../tctp/sequence_queue'
+require 'rack/tctp/halec'
 
 class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHandler
 
@@ -113,14 +113,16 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
   end
 
   def relay_as_chunked(data)
-    chunk_length_as_hex = data.length.to_s(16)
+    unless data.length == 0
+      chunk_length_as_hex = data.length.to_s(16)
 
-    log.debug (log_key) { "Relaying #{data.length} (#{chunk_length_as_hex}) bytes of data from backend to client" }
+      log.debug (log_key) { "Relaying #{data.length} (#{chunk_length_as_hex}) bytes of data from backend to client" }
 
-    @backend.plexer.relay_from_backend chunk_length_as_hex
-    @backend.plexer.relay_from_backend "\r\n"
-    @backend.plexer.relay_from_backend data
-    @backend.plexer.relay_from_backend "\r\n"
+      @backend.plexer.relay_from_backend chunk_length_as_hex
+      @backend.plexer.relay_from_backend "\r\n"
+      @backend.plexer.relay_from_backend data
+      @backend.plexer.relay_from_backend "\r\n"
+    end
   end
 
   def finish_response
@@ -173,7 +175,6 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
       @http_parser << data
     rescue Exception => e
       puts e
-      puts data
     end
   end
 
