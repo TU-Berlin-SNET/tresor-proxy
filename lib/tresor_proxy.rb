@@ -2,8 +2,6 @@ require_relative 'connection'
 require_relative 'logging'
 require_relative 'connection_pool'
 
-require 'fiber'
-require 'em-synchrony'
 require 'logger'
 
 module Tresor
@@ -79,7 +77,7 @@ module Tresor
     def start
       begin
         EM.epoll
-        EM.synchrony do
+        EM.run do
           trap("TERM") { stop }
           trap("INT")  { stop }
 

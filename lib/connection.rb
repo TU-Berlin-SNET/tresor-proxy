@@ -22,7 +22,15 @@ module Tresor
     def initialize(proxy)
       @proxy = proxy
 
+      EM.defer do
+        async_action_queue.pop.call while true
+      end
+
       reset_http_parser
+    end
+
+    def async_action_queue
+      @async_action_queue ||= Queue.new
     end
 
     def reset_http_parser
@@ -157,21 +165,23 @@ module Tresor
       end
 
       @http_parser.on_message_complete = proc do |env|
-        if @has_request_body
-          @backend_future.callback do |backend|
-            if @tctp_decryption_requested
-              log.debug (log_key) { 'Sent encrypted backend response to client.' }
+        async_action_queue.push proc {
+          if @has_request_body
+            @backend_future.callback do |backend|
+              if @tctp_decryption_requested
+                log.debug (log_key) { 'Sent encrypted backend response to client.' }
 
-              backend.client_chunk "0\r\n\r\n" if @http_parser.headers['Transfer-Encoding'].eql? 'chunked'
+                backend.client_chunk "0\r\n\r\n" if @http_parser.headers['Transfer-Encoding'].eql? 'chunked'
 
-              proxy.halec_registry.halecs(:server)[@server_halec.url] = @server_halec
+                proxy.halec_registry.halecs(:server)[@server_halec.url] = @server_halec
 
-              @server_halec = nil
-            else
-              send_client_trailer_chunk if @http_parser.headers['Transfer-Encoding'].eql?('chunked') || backend.backend_handler.is_a?(Tresor::Backend::TCTPEncryptToBackendHandler)
+                @server_halec = nil
+              else
+                send_client_trailer_chunk if @http_parser.headers['Transfer-Encoding'].eql?('chunked') || backend.backend_handler.is_a?(Tresor::Backend::TCTPEncryptToBackendHandler)
+              end
             end
           end
-        end
+        }
       end
     end
 
@@ -191,18 +201,22 @@ module Tresor
 
     # Decrypts +chunk+ and sends it to the client
     def send_decrypted_data(backend, chunk)
-      send_as_chunked backend, @server_halec.decrypt_data(chunk)
+      async_action_queue.push proc {
+        send_as_chunked backend, @server_halec.decrypt_data(chunk)
+      }
     end
 
     # Encrypts +chunk+ and sends it to the client
     def send_encrypted_data(chunk)
-      encrypted_data = @server_halec.encrypt_data chunk
+      async_action_queue.push proc {
+        encrypted_data = @server_halec.encrypt_data chunk
 
-      chunk_length_as_hex = encrypted_data.length.to_s(16)
+        chunk_length_as_hex = encrypted_data.length.to_s(16)
 
-      log.debug (log_key) { "Sending #{encrypted_data.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
+        log.debug (log_key) { "Sending #{encrypted_data.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
 
-      send_data "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
+        send_data "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
+      }
     end
 
     def send_as_chunked(backend, decrypted_data)
@@ -266,15 +280,17 @@ module Tresor
 
           # If the backend response is complete, return the HALEC
           @client_http_parser.on_message_complete = proc do
-            send_data "0\r\n\r\n"
+            async_action_queue.push proc {
+              send_data "0\r\n\r\n"
 
-            proxy.halec_registry.register_halec(:server, @server_halec)
+              proxy.halec_registry.register_halec(:server, @server_halec)
 
-            @server_halec = nil
-            @client_http_parser = nil
-            @tctp_decryption_requested = nil
+              @server_halec = nil
+              @client_http_parser = nil
+              @tctp_decryption_requested = nil
 
-            reset_http_parser
+              reset_http_parser
+            }
           end
         end
 
@@ -289,9 +305,11 @@ module Tresor
           @client_http_parser = HTTP::Parser.new
 
           @client_http_parser.on_message_complete = proc do
-            @client_http_parser = nil
+            async_action_queue.push Proc.new do
+              @client_http_parser = nil
 
-            reset_http_parser
+              reset_http_parser
+            end
           end
         end
       end
@@ -322,7 +340,7 @@ module Tresor
     end
 
     def log_key
-      "#{@proxy.name} - Client #{@client_ip}:#{@client_port} - Thread #{Thread.current.__id__}"
+      "#{@proxy.name} - Client #{@client_ip}:#{@client_port}"
     end
   end
 end

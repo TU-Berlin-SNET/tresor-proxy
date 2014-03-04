@@ -1,6 +1,10 @@
 require 'rack/tctp/halec'
+require_relative '../tctp/halec_extension'
 
 class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHandler
+  def async_action_queue
+    @async_action_queue ||= Queue.new
+  end
 
   # Initializes the Handler to encrypt to the +backend+ using the +halec_promise+ promise.
   # @param backend [Tresor::Backend::BasicBackend] The backend
@@ -17,6 +21,12 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
 
     cookie = @backend.proxy.halec_registry.get_tctp_cookie(backend.host)
     tctp_cookie_sent = false
+
+    EM.defer do
+      while true
+        async_action_queue.pop.call
+      end
+    end
 
     @backend.send_data start_line
     @backend.client_headers.each do |header, value|
@@ -84,12 +94,12 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
           chunk_without_url = chunk[(first_newline_index + 2)..-1]
 
           unless chunk_without_url.eql?('')
-            relay_as_chunked @halec.decrypt_data(chunk_without_url)
+            decrypt_and_relay chunk_without_url
           end
 
           @first_chunk = false
         else
-          relay_as_chunked @halec.decrypt_data(chunk)
+          decrypt_and_relay chunk
         end
       else
         relay_as_chunked(chunk)
@@ -112,23 +122,28 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
     end
   end
 
+  def decrypt_and_relay(data)
+    async_action_queue.push proc { relay_as_chunked @halec.decrypt_data(data) }
+  end
+
   def relay_as_chunked(data)
     unless data.length == 0
       chunk_length_as_hex = data.length.to_s(16)
 
       log.debug (log_key) { "Relaying #{data.length} (#{chunk_length_as_hex}) bytes of data from backend to client" }
 
-      @backend.plexer.relay_from_backend chunk_length_as_hex
-      @backend.plexer.relay_from_backend "\r\n"
-      @backend.plexer.relay_from_backend data
-      @backend.plexer.relay_from_backend "\r\n"
+      relay "#{chunk_length_as_hex}\r\n#{data}\r\n"
     end
   end
 
   def finish_response
+    async_action_queue.push proc { do_finish_response }
+  end
+
+  def do_finish_response
     log.info (log_key) { 'Sending trailer to client' }
 
-    @backend.plexer.relay_from_backend "0\r\n\r\n" if @has_body
+    relay "0\r\n\r\n" if @has_body
 
     if @encrypted_response
       @halec_promise.return
@@ -138,6 +153,12 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
   end
 
   def client_chunk(data)
+    async_action_queue.push proc {
+      do_client_chunk data
+    }
+  end
+
+  def do_client_chunk(data)
     if data[-5,5].eql? "0\r\n\r\n"
       @backend.send_data "0\r\n\r\n"
 

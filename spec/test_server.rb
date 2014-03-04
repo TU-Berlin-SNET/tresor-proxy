@@ -14,12 +14,12 @@ module Tresor
 
           input_string = input.string
 
-          IO.write('expected', current_post_body)
-          IO.write('actual', input_string)
-
           if current_post_body.eql? input_string
             [ 200, {'Content-Type' => 'text/plain', 'Content-Length' => "#{input_string.length}"}, [input_string]]
           else
+            IO.write(File.join(__dir__, 'test_body_expected.txt'), current_post_body)
+            IO.write(File.join(__dir__, 'test_body_received.txt'), input_string)
+
             [ 500, {'Content-Type' => 'text/plain', 'Content-Length' => '30'}, ['Did not receive correct string']]
           end
         else

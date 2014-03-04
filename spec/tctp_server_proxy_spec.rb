@@ -101,20 +101,14 @@ describe 'A tctp server proxy' do
     expect(decrypted_body).to eql('Success')
 
     # Creates a POST body
-    plaintext_test_body = StringIO.new
-    (1..1000000).each do |x|
-      plaintext_test_body.write "#{x}:"
-    end
-
-    test_body_string = plaintext_test_body.string
-    @test_server.current_post_body = test_body_string
+    @test_server.current_post_body = test_body
 
     # Create encrypted body
     encrypted_body_io = StringIO.new
     encrypted_body_io.write "#{halec_url}\r\n"
 
     # Encrypts plaintext_test_body
-    encrypted_body_io.write client_halec.encrypt_data(test_body_string)
+    encrypted_body_io.write client_halec.encrypt_data(test_body)
 
     request = Net::HTTP::Post.new('/')
     request.body = encrypted_body_io.string
@@ -135,6 +129,6 @@ describe 'A tctp server proxy' do
     decrypted_body = client_halec.decrypt_data(body_stream.read)
 
     # Compares the response
-    expect(decrypted_body).to eql(test_body_string)
+    expect(decrypted_body).to eql(test_body)
   end
 end

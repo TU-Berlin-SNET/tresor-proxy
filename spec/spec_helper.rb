@@ -2,7 +2,11 @@ require 'rspec'
 
 require 'simplecov'
 
-#require_relative 'support/shared_proxy_spec'
+require_relative 'support/rspec-prof'
+require_relative 'support/test_body_generator'
+require_relative 'support/shared-proxy'
+
+require_relative '../lib/tresor_proxy'
 
 # spec_helper.rb
 RSpec.configure do |config|
@@ -10,4 +14,8 @@ RSpec.configure do |config|
   config.expect_with :rspec do |c|
     c.syntax = :expect
   end
+
+  config.include Tresor::TestBodyGenerator
+
+  Tresor::TresorProxy.logger.level = ::Logger::INFO
 end
