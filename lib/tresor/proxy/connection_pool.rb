@@ -1,10 +1,7 @@
-require_relative 'backend/basic_backend'
-
-require 'eventmachine'
 require 'uri'
 require 'resolv'
 
-module Tresor
+module Tresor::Proxy
   class ConnectionPool
     attr_reader :free_backends
     attr_reader :proxy

@@ -1,6 +1,4 @@
 require_relative 'spec_helper'
-
-require_relative '../lib/tresor_proxy'
 require_relative 'test_server'
 
 require 'webrick'
@@ -11,7 +9,7 @@ require 'rack-tctp'
 
 describe 'A tctp server proxy' do
   before(:all) do
-    @proxy = Tresor::TresorProxy.new '127.0.0.1', '43215', 'TCTP server proxy'
+    @proxy = Tresor::Proxy::TresorProxy.new '127.0.0.1', '43215', 'TCTP server proxy'
 
     @proxy.is_tctp_server = true
     @proxy.reverse_mappings = { '127.0.0.1' => 'http://127.0.0.1:43216' }
@@ -29,8 +27,8 @@ describe 'A tctp server proxy' do
     Thread.new do @proxy.start end
     Thread.new do @webrick_server.start end
 
-    until @proxy.started do Thread.pass end
-    until @webrick_server.status.eql? :Running do Thread.pass end
+    until @proxy.started do sleep 0.1 end
+    until @webrick_server.status.eql? :Running do sleep 0.1 end
   end
 
   after(:all) do
@@ -39,11 +37,13 @@ describe 'A tctp server proxy' do
     @proxy.stop
     @webrick_server.stop
 
-    while @proxy.started do Thread.pass end
-    until @webrick_server.status.eql? :Stop do Thread.pass end
+    while @proxy.started do sleep 0.1 end
+    until @webrick_server.status.eql? :Stop do sleep 0.1 end
   end
 
   it 'can be used to issue forward GET and POST request' do
+    # TODO Test TCTP discovery
+
     client_halec = Rack::TCTP::ClientHALEC.new()
 
     # Receive the TLS client_hello

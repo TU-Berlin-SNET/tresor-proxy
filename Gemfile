@@ -1,5 +1,6 @@
 source 'https://rubygems.org'
 
+gem 'activesupport'
 gem 'eventmachine', '~> 1.0.3'
 gem 'http_parser.rb', '0.6.0.beta.2'
 gem 'slop'

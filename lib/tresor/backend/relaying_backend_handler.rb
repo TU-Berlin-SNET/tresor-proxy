@@ -1,5 +1,3 @@
-require_relative 'backend_handler'
-
 module Tresor
   module Backend
     class RelayingBackendHandler < BackendHandler

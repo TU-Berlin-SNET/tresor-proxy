@@ -1,5 +1,3 @@
-require_relative '../tctp/tctp'
-
 class Tresor::Backend::TCTPDiscoveryBackendHandler < Tresor::Backend::BackendHandler
   def initialize(backend)
     @backend = backend

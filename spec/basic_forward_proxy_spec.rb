@@ -10,7 +10,7 @@
 #
 #describe 'A basic forward proxy' do
 #  before(:all) do
-#    @proxy = Tresor::TresorProxy.new '127.0.0.1', '43208', 'Basic test proxy'
+#    @proxy = Tresor::Proxy::TresorProxy.new '127.0.0.1', '43208', 'Basic test proxy'
 #    BASIC_FORWARD_TEST_SERVER = Tresor::TestServer.new
 #
 #    @thin_server = Thin::Server.new '127.0.0.1', 43209, @test_server

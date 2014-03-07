@@ -1,7 +1,3 @@
-require_relative '../tctp/tctp'
-
-require 'rack/tctp/halec'
-
 class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHandler
   def initialize(backend)
     @backend = backend

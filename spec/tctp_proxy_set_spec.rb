@@ -1,6 +1,4 @@
 require_relative 'spec_helper'
-
-require_relative '../lib/tresor_proxy'
 require_relative 'test_server'
 
 require 'thin'
@@ -12,8 +10,8 @@ describe 'A set of tctp proxies' do
   before(:all) do
     puts "Before a set of tctp proxies"
 
-    @first_proxy = Tresor::TresorProxy.new '127.0.0.1', '43210', 'First TCTP proxy'
-    @second_proxy = Tresor::TresorProxy.new '127.0.0.1', '43211', 'Second TCTP proxy'
+    @first_proxy = Tresor::Proxy::TresorProxy.new '127.0.0.1', '43210', 'First TCTP proxy'
+    @second_proxy = Tresor::Proxy::TresorProxy.new '127.0.0.1', '43211', 'Second TCTP proxy'
 
     @first_proxy.is_tctp_client = true
 
@@ -36,9 +34,9 @@ describe 'A set of tctp proxies' do
     Thread.new do @second_proxy.start end
     Thread.new do @webrick_server.start end
 
-    until @first_proxy.started do Thread.pass end
-    until @second_proxy.started do Thread.pass end
-    until @webrick_server.status.eql? :Running do Thread.pass end
+    until @first_proxy.started do sleep 0.1 end
+    until @second_proxy.started do sleep 0.1 end
+    until @webrick_server.status.eql? :Running do sleep 0.1 end
   end
 
   after(:all) do
@@ -46,9 +44,9 @@ describe 'A set of tctp proxies' do
     @second_proxy.stop
     @webrick_server.stop
 
-    while @first_proxy.started do Thread.pass end
-    while @second_proxy.started do Thread.pass end
-    until @webrick_server.status.eql? :Stop do Thread.pass end
+    while @first_proxy.started do sleep 0.1 end
+    while @second_proxy.started do sleep 0.1 end
+    until @webrick_server.status.eql? :Stop do sleep 0.1 end
   end
 
   def proxy_uri

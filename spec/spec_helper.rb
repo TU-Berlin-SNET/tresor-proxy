@@ -6,7 +6,7 @@ require_relative 'support/rspec-prof'
 require_relative 'support/test_body_generator'
 require_relative 'support/shared-proxy'
 
-require_relative '../lib/tresor_proxy'
+require_relative '../lib/tresor'
 
 # spec_helper.rb
 RSpec.configure do |config|
@@ -17,5 +17,5 @@ RSpec.configure do |config|
 
   config.include Tresor::TestBodyGenerator
 
-  Tresor::TresorProxy.logger.level = ::Logger::INFO
+  Tresor::Proxy::TresorProxy.logger.level = ::Logger::INFO
 end

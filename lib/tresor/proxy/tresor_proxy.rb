@@ -1,10 +1,6 @@
-require_relative 'connection'
-require_relative 'logging'
-require_relative 'connection_pool'
-
 require 'logger'
 
-module Tresor
+module Tresor::Proxy
   class TresorProxy
     @@logger = Logger.new(STDOUT)
 
@@ -60,7 +56,7 @@ module Tresor
       @port = port
       @name = name
       @connection_pool = ConnectionPool.new(self)
-      @halec_registry = TCTP::HALECRegistry.new
+      @halec_registry = Tresor::TCTP::HALECRegistry.new
       @reverse_mappings = {}
 
       @start_callback = EventMachine::DefaultDeferrable.new
@@ -89,7 +85,7 @@ module Tresor
             end
           end
 
-          EventMachine::start_server(@host, @port, Tresor::Connection, self)
+          EventMachine::start_server(@host, @port, Connection, self)
 
           log.info { "#{@name} started on #{@host}:#{@port}" }
 

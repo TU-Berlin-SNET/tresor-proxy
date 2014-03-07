@@ -1,12 +1,3 @@
-require 'eventmachine'
-
-require_relative 'relaying_backend_handler'
-require_relative 'tctp_discovery_backend_handler'
-require_relative 'tctp_handshake_backend_handler'
-require_relative 'tctp_encrypt_to_backend_handler'
-
-require_relative '../tctp/halec_registry'
-
 module Tresor
   module Backend
     class BasicBackend < EventMachine::Connection

@@ -1,6 +1,3 @@
-require 'rack/tctp/halec'
-require_relative '../tctp/halec_extension'
-
 class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHandler
   def async_action_queue
     @async_action_queue ||= Queue.new
@@ -192,11 +189,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
   def receive_data(data)
     log.debug (log_key) { "Feeding #{data.length} bytes of encrypted data to HTTP parser" }
 
-    begin
-      @http_parser << data
-    rescue Exception => e
-      puts e
-    end
+    @http_parser << data
   end
 
   def log_key

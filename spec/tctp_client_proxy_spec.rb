@@ -1,6 +1,4 @@
 require_relative 'spec_helper'
-
-require_relative '../lib/tresor_proxy'
 require_relative 'test_server'
 
 require 'webrick'
@@ -11,7 +9,7 @@ require 'rack-tctp'
 
 describe 'A tctp client proxy' do
   before(:all) do
-    @proxy = Tresor::TresorProxy.new '127.0.0.1', '43213', 'TCTP client proxy'
+    @proxy = Tresor::Proxy::TresorProxy.new '127.0.0.1', '43213', 'TCTP client proxy'
 
     @proxy.is_tctp_client = true
 
@@ -30,18 +28,16 @@ describe 'A tctp client proxy' do
     Thread.new do @proxy.start end
     Thread.new do @webrick_server.start end
 
-    until @proxy.started do Thread.pass end
-    until @webrick_server.status.eql? :Running do Thread.pass end
+    until @proxy.started do sleep 0.1 end
+    until @webrick_server.status.eql? :Running do sleep 0.1 end
   end
 
   after(:all) do
-    puts "After tctp client proxy"
-
     @proxy.stop
     @webrick_server.stop
 
-    while @proxy.started do Thread.pass end
-    until @webrick_server.status.eql? :Stop do Thread.pass end
+    while @proxy.started do sleep 0.1 end
+    until @webrick_server.status.eql? :Stop do sleep 0.1 end
   end
 
   def proxy_uri
