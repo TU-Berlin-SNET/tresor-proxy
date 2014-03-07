@@ -25,7 +25,7 @@ module Tresor
       end
 
       def receive_data(data)
-        @backend.plexer.relay_from_backend data
+        relay data
 
         @http_parser << data
       end

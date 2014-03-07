@@ -16,11 +16,6 @@ module Tresor
       def initialize(connection)
         super(connection)
 
-        # TODO Untangle #relay_from_backend from Connection
-        connection.define_singleton_method(:relay_from_backend) do |data|
-          frontend_handler.relay_from_backend data
-        end
-
         @backend_future = connection.proxy.connection_pool.get_backend_future(connection)
 
         @backend_future.callback do |backend|

@@ -4,7 +4,11 @@ module Tresor
       attr_accessor :proxy
       attr_accessor :connection_pool_key
       attr_accessor :host
-      attr_accessor :plexer
+
+      # The client connection
+      # @return [Tresor::Proxy::Connection] The client connection
+      # @!attr [rw] client_connection
+      attr_accessor :client_connection
 
       attr_accessor :client_method
       attr_accessor :client_path
@@ -16,7 +20,7 @@ module Tresor
       attr_accessor :receive_data_future
 
       def initialize(client_connection, http_hostname, connection_key)
-        @plexer = client_connection
+        @client_connection = client_connection
         @host= http_hostname
         @proxy= client_connection.proxy
         @connection_pool_key = connection_key

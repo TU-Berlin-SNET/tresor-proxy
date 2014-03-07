@@ -1,6 +1,8 @@
 module Tresor
   module Backend
     class BackendHandler
+      # The Backend
+      # @return [Tresor::Backend::BasicBackend] The backend
       attr :backend
 
       def build_start_line
@@ -9,7 +11,7 @@ module Tresor
 
       # Relays data from backend to client
       def relay(data)
-        @backend.plexer.relay_from_backend data
+        backend.client_connection.frontend_handler.relay_from_backend data
       end
     end
   end

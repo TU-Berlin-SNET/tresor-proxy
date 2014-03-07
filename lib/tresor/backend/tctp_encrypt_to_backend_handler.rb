@@ -46,7 +46,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
     @backend.send_data "\r\n\r\n"
 
     @http_parser.on_headers_complete = proc do |headers|
-      @backend.plexer.relay_from_backend "HTTP/1.1 #{@http_parser.status_code}\r\n"
+      relay "HTTP/1.1 #{@http_parser.status_code}\r\n"
 
       headers.each do |header, value|
         if %w[Transfer-Encoding Content-Length].include? header
@@ -58,7 +58,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
         if header.eql? 'Content-Encoding'
           @encrypted_response = value.eql? 'encrypted'
         else
-          @backend.plexer.relay_from_backend "#{header}: #{value}\r\n"
+          relay "#{header}: #{value}\r\n"
         end
       end
 
@@ -66,9 +66,8 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
         log.warn (log_key) {"Got unencrypted response from #{backend.host} (#{backend.connection_pool_key}) for encrypted request #{build_start_line}!"}
       end
 
-      @backend.plexer.relay_from_backend "Transfer-Encoding: chunked\r\n" if @has_body
-
-      @backend.plexer.relay_from_backend "\r\n"
+      relay "Transfer-Encoding: chunked\r\n" if @has_body
+      relay "\r\n"
     end
 
     @first_chunk = true
@@ -109,7 +108,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
       if @encrypted_response
         finish_response
       else
-        @backend.plexer.relay_from_backend "0\r\n\r\n"
+        relay "0\r\n\r\n"
       end
     end
 
