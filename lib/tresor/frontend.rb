@@ -4,6 +4,7 @@ module Tresor
 
     autoload :FrontendHandler
     autoload :HTTPRelayFrontendHandler
+    autoload :HTTPEncryptingRelayFrontendHandler
     autoload :TCTPDiscoveryFrontendHandler
     autoload :TCTPHalecCreationFrontendHandler
     autoload :TCTPHandshakeFrontendHandler

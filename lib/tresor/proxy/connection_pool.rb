@@ -11,22 +11,22 @@ module Tresor::Proxy
       @free_backends = {}
     end
 
-    def get_backend_future(connection, &block)
+    def get_backend_future(connection)
       # Forward proxy
       if connection.http_parser.request_url.start_with?('http')
-        get_backend_future_for_forward_url(connection, &block)
+        get_backend_future_for_forward_url(connection)
       else
-        get_backend_future_for_reverse_host(connection, &block)
+        get_backend_future_for_reverse_host(connection)
       end
     end
 
-    def get_backend_future_for_forward_url(connection, host = nil, port = nil, &block)
+    def get_backend_future_for_forward_url(connection, host = nil, port = nil)
       uri = URI.parse(connection.http_parser.request_url)
 
-      get_backend_future_for_host(uri.hostname, uri.port, uri.host, connection, &block)
+      get_backend_future_for_host(uri.hostname, uri.port, uri.host, connection)
     end
 
-    def get_backend_future_for_reverse_host(connection, &block)
+    def get_backend_future_for_reverse_host(connection)
       requested_host = connection.http_parser.headers['Host'].partition(':').first
 
       reverse_host = @proxy.reverse_mappings[requested_host]
@@ -34,7 +34,7 @@ module Tresor::Proxy
       if reverse_host
         parsed_reverse_host = URI(reverse_host)
 
-        get_backend_future_for_host(parsed_reverse_host.hostname, parsed_reverse_host.port, requested_host, connection, &block)
+        get_backend_future_for_host(parsed_reverse_host.hostname, parsed_reverse_host.port, requested_host, connection)
       else
         backend_future = EventMachine::DefaultDeferrable.new
         backend_future.fail "This proxy is not configured to reverse proxy #{requested_host}"
@@ -42,7 +42,7 @@ module Tresor::Proxy
       end
     end
 
-    def get_backend_future_for_host(host, port, http_hostname, client_connection, &block)
+    def get_backend_future_for_host(host, port, http_hostname, client_connection)
       backend_future = EventMachine::DefaultDeferrable.new
 
       EM.defer do
@@ -55,18 +55,12 @@ module Tresor::Proxy
 
           backend = @free_backends[connection_key].pop
           if backend.nil?
-            backend = EventMachine::connect(ip, port, Tresor::Backend::BasicBackend) do |b|
-              b.connection_pool_key = connection_key
-              b.host = http_hostname
-              b.proxy = client_connection.proxy
-            end
+            backend = EventMachine::connect(ip, port, Tresor::Backend::BasicBackend, client_connection, http_hostname, connection_key)
+
             log.debug (log_key) { "Created connection #{backend.__id__} to #{connection_key} (Host: #{http_hostname})" }
           else
             log.debug (log_key) { "Reusing connection #{backend.__id__} to #{connection_key} (Host: #{http_hostname})" }
           end
-          backend.plexer = client_connection
-
-          block.call backend
 
           EM.schedule do
             backend_future.succeed backend
@@ -91,8 +85,8 @@ module Tresor::Proxy
       @free_backends[connection_pool_key] << backend
     end
 
-    def backend_unbind(connection_pool_key, backend)
-      @free_backends[connection_pool_key].delete(backend)
+    def backend_unbind(backend)
+      @free_backends[backend.connection_pool_key].delete(backend)
     end
 
     def log_key

@@ -11,6 +11,7 @@ module Tresor::Proxy
             Tresor::Frontend::TCTPDiscoveryFrontendHandler,
             Tresor::Frontend::TCTPHalecCreationFrontendHandler,
             Tresor::Frontend::TCTPHandshakeFrontendHandler,
+            Tresor::Frontend::HTTPEncryptingRelayFrontendHandler,
             Tresor::Frontend::HTTPRelayFrontendHandler
         ]
       end

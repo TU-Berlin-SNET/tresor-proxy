@@ -15,7 +15,12 @@ module Tresor
       attr_accessor :client_chunk_future
       attr_accessor :receive_data_future
 
-      def initialize
+      def initialize(client_connection, http_hostname, connection_key)
+        @plexer = client_connection
+        @host= http_hostname
+        @proxy= client_connection.proxy
+        @connection_pool_key = connection_key
+
         reset_backend_handler
       end
 
@@ -40,7 +45,7 @@ module Tresor
       def free_backend
         reset_backend_handler
 
-        proxy.connection_pool.backend_unbind(connection_pool_key, self)
+        proxy.connection_pool.backend_unbind(self)
       end
 
       # Receives current client request
