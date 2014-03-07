@@ -1,5 +1,6 @@
 module Tresor
   module Backend
+    # A BackendHandler
     class BackendHandler
       # The Backend
       # @return [Tresor::Backend::BasicBackend] The backend

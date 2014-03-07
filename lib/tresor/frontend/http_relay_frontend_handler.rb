@@ -10,21 +10,12 @@ module Tresor
 
       attr_accessor :backend_future
 
-      # Initializes this HTTP relay handler by getting a backend future and notifying it with the client
-      # request.
+      # Initializes this HTTP relay handler by getting a backend future
       # @param [EventMachine::Connection] connection The client connection
       def initialize(connection)
         super(connection)
 
         @backend_future = connection.proxy.connection_pool.get_backend_future(connection)
-
-        @backend_future.callback do |backend|
-          parsed_uri = URI.parse(connection.http_parser.request_url)
-
-          parsed_uri.path = '/' if parsed_uri.path.eql?('')
-
-          backend.client_request connection.http_parser.http_method, parsed_uri.path, parsed_uri.query, connection.http_parser.headers
-        end
 
         @backend_future.errback do |error|
           send_error_response(error)

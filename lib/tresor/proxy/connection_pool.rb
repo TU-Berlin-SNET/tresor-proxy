@@ -62,6 +62,11 @@ module Tresor::Proxy
             log.debug (log_key) { "Reusing connection #{backend.__id__} to #{connection_key} (Host: #{http_hostname})" }
           end
 
+          parsed_uri = URI.parse(client_connection.http_parser.request_url)
+          parsed_uri.path = '/' if parsed_uri.path.eql?('')
+
+          backend.client_request client_connection.http_parser.http_method, parsed_uri.path, parsed_uri.query, client_connection.http_parser.headers
+
           EM.schedule do
             backend_future.succeed backend
           end
