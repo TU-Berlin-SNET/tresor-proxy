@@ -21,12 +21,10 @@ module Tresor
         super(connection)
 
         log.debug (log_key) {'Got TCTP discovery request'}
-
-        connection.send_data TCTPDiscoveryFrontendHandler.discovery_response
       end
 
       def on_message_complete
-
+        connection.send_data TCTPDiscoveryFrontendHandler.discovery_response
       end
     end
   end

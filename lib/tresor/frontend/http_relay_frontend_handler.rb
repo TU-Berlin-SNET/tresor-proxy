@@ -18,21 +18,13 @@ module Tresor
           frontend_handler.relay_from_backend data
         end
 
-        send_client_request = proc do |backend|
+        @backend_future = connection.proxy.connection_pool.get_backend_future(connection) do |backend|
           parsed_uri = URI.parse(connection.http_parser.request_url)
 
           parsed_uri.path = '/' if parsed_uri.path.eql?('')
 
           # Inform Backend about the current client request
           backend.client_request connection.http_parser.http_method, parsed_uri.path, parsed_uri.query, connection.http_parser.headers
-        end
-
-        if connection.http_parser.request_url.start_with?('http')
-          # Forward proxy
-          @backend_future = connection.proxy.connection_pool.get_backend_future_for_forward_url(connection.http_parser.request_url, connection, &send_client_request)
-        else
-          # Reverse proxy
-          @backend_future = connection.proxy.connection_pool.get_backend_future_for_reverse_host(connection.http_parser.headers['Host'], connection, &send_client_request)
         end
 
         # Strip TCTP encryption information from request as we are decrypting it
