@@ -49,14 +49,6 @@ module Tresor
 
         log.debug (log_key) {"Relaying #{data.size} bytes directly to client."}
         connection.send_data data
-
-        unless @client_http_parser
-          @client_http_parser = HTTP::Parser.new
-
-          @client_http_parser.on_message_complete = proc do
-            connection.reset_http_parser
-          end
-        end
       end
 
       def send_client_trailer_chunk

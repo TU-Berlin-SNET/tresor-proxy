@@ -128,8 +128,6 @@ module Tresor
             connection.send_data "0\r\n\r\n"
 
             connection.proxy.halec_registry.register_halec(:server, @server_halec)
-
-            connection.reset_http_parser
           end
         end
 
