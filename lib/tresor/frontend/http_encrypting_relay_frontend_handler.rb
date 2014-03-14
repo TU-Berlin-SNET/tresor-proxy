@@ -10,6 +10,11 @@ module Tresor
         end
       end
 
+      # The Server HALEC used for encryption
+      # @return [Rack::TCTP::ServerHALEC]
+      # @!attr [r] server_halec
+      attr :server_halec
+
       def initialize(connection)
         super(connection)
 
@@ -25,7 +30,7 @@ module Tresor
         # Get the server HALEC url from the incoming client connection and set @server_halec to decide
         # when relaying, to either use the same HALEC (in case of HTTP bodies), or any HALEC (in case of body-
         # less HTTP requests)
-        unless @server_halec
+        unless server_halec
           first_newline_index = chunk.index("\r\n")
           body_halec_url = chunk[0, first_newline_index]
 
@@ -59,7 +64,11 @@ module Tresor
 
       # Decrypts +chunk+ and sends it to the client
       def send_decrypted_data(chunk)
-        send_as_chunked @server_halec.decrypt_data(chunk)
+        server_halec.decrypt_data(chunk) do |decrypted|
+          EM.schedule do
+            send_as_chunked decrypted
+          end
+        end
       end
 
       def send_as_chunked(decrypted_data)
@@ -74,13 +83,15 @@ module Tresor
 
       # Encrypts +chunk+ and sends it to the client
       def relay_and_encrypt(chunk)
-        encrypted_data = @server_halec.encrypt_data chunk
+        server_halec.encrypt_data_async(chunk) do |encrypted_data|
+          EM.schedule do
+            chunk_length_as_hex = encrypted_data.length.to_s(16)
 
-        chunk_length_as_hex = encrypted_data.length.to_s(16)
+            log.debug (log_key) { "Sending #{encrypted_data.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
 
-        log.debug (log_key) { "Sending #{encrypted_data.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
-
-        connection.send_data "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
+            connection.send_data "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
+          end
+        end
       end
 
       def relay_from_backend(data)
@@ -125,9 +136,13 @@ module Tresor
 
           # If the backend response is complete, return the HALEC
           @client_http_parser.on_message_complete = proc do
-            connection.send_data "0\r\n\r\n"
+            server_halec.call_async do
+              EM.schedule do
+                connection.send_data "0\r\n\r\n"
 
-            connection.proxy.halec_registry.register_halec(:server, @server_halec)
+                connection.proxy.halec_registry.register_halec(:server, @server_halec)
+              end
+            end
           end
         end
 

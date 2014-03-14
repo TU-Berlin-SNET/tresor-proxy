@@ -1,8 +1,4 @@
 class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHandler
-  def async_action_queue
-    @async_action_queue ||= Queue.new
-  end
-
   # Initializes the Handler to encrypt to the +backend+ using the +halec_promise+ promise.
   # @param backend [Tresor::Backend::BasicBackend] The backend
   # @param halec_promise [Tresor::TCTP::HALECRegistry::HALECPromise] The promise
@@ -18,12 +14,6 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
 
     cookie = @backend.proxy.halec_registry.get_tctp_cookie(backend.host)
     tctp_cookie_sent = false
-
-    EM.defer do
-      while true
-        async_action_queue.pop.call
-      end
-    end
 
     @backend.send_data start_line
     @backend.client_headers.each do |header, value|
@@ -119,7 +109,11 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
   end
 
   def decrypt_and_relay(data)
-    async_action_queue.push proc { relay_as_chunked @halec.decrypt_data(data) }
+    @halec.decrypt_data_async(data) do |decrypted_data|
+      EM.schedule do
+        relay_as_chunked decrypted_data
+      end
+    end
   end
 
   def relay_as_chunked(data)
@@ -133,7 +127,11 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
   end
 
   def finish_response
-    async_action_queue.push proc { do_finish_response }
+    @halec.call_async do
+      EM.schedule do
+        do_finish_response
+      end
+    end
   end
 
   def do_finish_response
@@ -149,16 +147,14 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
   end
 
   def client_chunk(data)
-    async_action_queue.push proc {
-      do_client_chunk data
-    }
-  end
-
-  def do_client_chunk(data)
     if data[-5,5].eql? "0\r\n\r\n"
-      @backend.send_data "0\r\n\r\n"
+      @halec.call_async do
+        EM.schedule do
+          @backend.send_data "0\r\n\r\n"
 
-      @halec_promise.return
+          @halec_promise.return
+        end
+      end
     else
       log.debug (log_key) { "Encrypting #{data.length} bytes to backend." }
 
@@ -173,15 +169,17 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
         @backend.send_data chunk
       end
 
-      encrypted_data = @halec.encrypt_data data
+      @halec.encrypt_data_async(data) do |encrypted_data|
+        EM.schedule do
+          chunk_length_as_hex = encrypted_data.length.to_s(16)
 
-      chunk_length_as_hex = encrypted_data.length.to_s(16)
+          log.debug (log_key) { "Sending #{encrypted_data.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
 
-      log.debug (log_key) { "Sending #{encrypted_data.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
+          chunk = "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
 
-      chunk = "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
-
-      @backend.send_data chunk
+          @backend.send_data chunk
+        end
+      end
     end
   end
 
