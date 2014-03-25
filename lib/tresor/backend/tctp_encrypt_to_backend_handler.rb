@@ -1,110 +1,122 @@
-class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHandler
+class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBackendHandler
   # Initializes the Handler to encrypt to the +backend+ using the +halec_promise+ promise.
   # @param backend [Tresor::Backend::BasicBackend] The backend
   # @param halec_promise [Tresor::TCTP::HALECRegistry::HALECPromise] The promise
   def initialize(backend, halec_promise)
-    @backend = backend
+    @first_chunk = true
+    @message_complete = false
     @halec_promise = halec_promise
 
-    @http_parser = HTTP::Parser.new
+    super(backend)
+  end
 
+  def send_request_to_backend
     start_line = build_start_line
 
     log.debug (log_key) { "Encrypting to backend: #{start_line[0..-2]}" }
 
-    cookie = @backend.proxy.halec_registry.get_tctp_cookie(backend.host)
+    tctp_cookie = @backend.proxy.halec_registry.get_tctp_cookie(backend.host)
     tctp_cookie_sent = false
 
     @backend.send_data start_line
+
+    headers = []
     @backend.client_headers.each do |header, value|
       next if header.eql?('Accept-Encoding') || header.eql?('Content-Length')
-      if header.eql?('Cookie') && cookie
-        value = "#{value}; #{cookie}"
+
+      if header.eql?('Cookie') && tctp_cookie
+        headers << {'Cookie' => "#{value}; #{tctp_cookie}"}
         tctp_cookie_sent = true
       end
 
       # Send Host header of reverse URL
       if header.eql? 'Host'
-        value = @backend.host
-      end
-
-      @backend.send_data "#{header}: #{value}\r\n"
-    end
-    @backend.send_data "Transfer-Encoding: chunked\r\nContent-Encoding: encrypted\r\n" if @backend.client_headers.has_key? 'Content-Length'
-    @backend.send_data "Cookie: #{cookie}\r\n" unless tctp_cookie_sent
-    @backend.send_data 'Accept-Encoding: encrypted'
-    @backend.send_data "\r\n\r\n"
-
-    @http_parser.on_headers_complete = proc do |headers|
-      relay "HTTP/1.1 #{@http_parser.status_code}\r\n"
-
-      headers.each do |header, value|
-        if %w[Transfer-Encoding Content-Length].include? header
-          @has_body = true
-
-          next
-        end
-
-        if header.eql? 'Content-Encoding'
-          @encrypted_response = value.eql? 'encrypted'
-        else
-          relay "#{header}: #{value}\r\n"
-        end
-      end
-
-      unless @encrypted_response
-        log.warn (log_key) {"Got unencrypted response from #{backend.host} (#{backend.connection_pool_key}) for encrypted request #{build_start_line}!"}
-      end
-
-      relay "Transfer-Encoding: chunked\r\n" if @has_body
-      relay "\r\n"
-    end
-
-    @first_chunk = true
-    @message_complete = false
-
-    @http_parser.on_body = proc do |chunk|
-      if(@encrypted_response)
-        log.debug (log_key) {"Got #{chunk.length} encrypted bytes HTTP body"}
-
-        # On first chunk: Get the HALEC URL, redeem the promise (get the corresponding HALEC) and set up the HALEC to write
-        # unencrypted data as chunks back to the client.
-        if @first_chunk
-          first_newline_index = chunk.index("\r\n")
-          body_halec_url = chunk[0, first_newline_index]
-
-          log.debug (log_key) { "Body was encrypted using HALEC #{body_halec_url}" }
-
-          @halec = @halec_promise.redeem_halec(URI(body_halec_url))
-
-          chunk_without_url = chunk[(first_newline_index + 2)..-1]
-
-          unless chunk_without_url.eql?('')
-            decrypt_and_relay chunk_without_url
-          end
-
-          @first_chunk = false
-        else
-          decrypt_and_relay chunk
-        end
+        headers << {'Host' => @backend.host}
       else
-        relay_as_chunked(chunk)
+        headers << {header => value}
       end
     end
 
-    @http_parser.on_message_complete = proc do |env|
-      log.debug (log_key) { "Finished receiving backend response to #{@backend.client_method} #{@backend.client_path}#{@backend.client_query_string ? "?#{@backend.client_query_string}": ''}." }
+    if @backend.client_headers.has_key? 'Content-Length'
+      headers << {'Transfer-Encoding' => 'chunked'}
+      headers << {'Content-Encoding' => 'encrypted'}
+    end
 
-      if @encrypted_response
-        finish_response
+    headers << {'Cookie' => tctp_cookie} unless tctp_cookie_sent
+    headers << {'Accept-Encoding' => 'encrypted'}
+
+    send_client_headers headers
+
+    @backend.send_data "\r\n"
+  end
+
+  def on_backend_headers_complete(backend_headers)
+    relay "HTTP/1.1 #{@http_parser.status_code}\r\n"
+
+    headers = []
+    backend_headers.each do |header, value|
+      if %w[Transfer-Encoding Content-Length].include? header
+        @has_body = true
+
+        headers << {header => value}
+
+        next
+      end
+
+      if header.eql? 'Content-Encoding'
+        @encrypted_response = value.eql? 'encrypted'
       else
-        relay "0\r\n\r\n"
+        headers << {header => value}
       end
     end
 
-    EM.schedule do
-      @backend.client_chunk_future.succeed self
-      @backend.receive_data_future.succeed self
+    unless @encrypted_response
+      log.warn (log_key) {"Got unencrypted response from #{backend.host} (#{backend.connection_pool_key}) for encrypted request #{build_start_line}!"}
+    end
+
+    headers << {'Transfer-Encoding' => 'chunked'} if @has_body
+
+    relay_backend_headers headers
+
+    relay "\r\n"
+  end
+
+  def on_backend_body(chunk)
+    if(@encrypted_response)
+      log.debug (log_key) {"Got #{chunk.length} encrypted bytes HTTP body"}
+
+      # On first chunk: Get the HALEC URL, redeem the promise (get the corresponding HALEC) and set up the HALEC to write
+      # unencrypted data as chunks back to the client.
+      if @first_chunk
+        first_newline_index = chunk.index("\r\n")
+        body_halec_url = chunk[0, first_newline_index]
+
+        log.debug (log_key) { "Body was encrypted using HALEC #{body_halec_url}" }
+
+        @halec = @halec_promise.redeem_halec(URI(body_halec_url))
+
+        chunk_without_url = chunk[(first_newline_index + 2)..-1]
+
+        unless chunk_without_url.eql?('')
+          decrypt_and_relay chunk_without_url
+        end
+
+        @first_chunk = false
+      else
+        decrypt_and_relay chunk
+      end
+    else
+      relay_as_chunked(chunk)
+    end
+  end
+
+  def on_backend_message_complete
+    log.debug (log_key) { "Finished receiving backend response to #{@backend.client_method} #{@backend.client_path}#{@backend.client_query_string ? "?#{@backend.client_query_string}": ''}." }
+
+    if @encrypted_response
+      finish_response
+    else
+      relay "0\r\n\r\n"
     end
   end
 
@@ -113,16 +125,6 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::BackendHan
       EM.schedule do
         relay_as_chunked decrypted_data
       end
-    end
-  end
-
-  def relay_as_chunked(data)
-    unless data.length == 0
-      chunk_length_as_hex = data.length.to_s(16)
-
-      log.debug (log_key) { "Relaying #{data.length} (#{chunk_length_as_hex}) bytes of data from backend to client" }
-
-      relay "#{chunk_length_as_hex}\r\n#{data}\r\n"
     end
   end
 

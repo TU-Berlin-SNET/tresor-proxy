@@ -16,3 +16,4 @@ end
 gem 'thin'
 gem 'faker'
 gem 'fuubar'
+gem 'nokogiri'

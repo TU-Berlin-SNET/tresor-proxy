@@ -17,5 +17,5 @@ RSpec.configure do |config|
 
   config.include Tresor::TestBodyGenerator
 
-  Tresor::Proxy::TresorProxy.logger.level = ::Logger::INFO
+  Tresor::Proxy::TresorProxy.logger.level = ::Logger::DEBUG
 end

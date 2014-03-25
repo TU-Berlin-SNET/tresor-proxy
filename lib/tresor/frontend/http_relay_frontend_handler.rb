@@ -18,9 +18,8 @@ module Tresor
         @backend_future = connection.proxy.connection_pool.get_backend_future(connection)
 
         @backend_future.errback do |error|
-          send_error_response(error)
-
-          close_connection_after_writing
+          connection.send_error_response(error)
+          connection.close_connection_after_writing
         end
 
         @has_request_body = false

@@ -16,6 +16,9 @@ module Tresor::Proxy
             Tresor::Frontend::TCTPDiscoveryFrontendHandler,
             Tresor::Frontend::TCTPHalecCreationFrontendHandler,
             Tresor::Frontend::TCTPHandshakeFrontendHandler,
+            Tresor::Frontend::ClaimSSO::RedirectToSSOFrontendHandler,
+            Tresor::Frontend::ClaimSSO::ProcessSAMLResponseFrontendHandler,
+            Tresor::Frontend::TresorProxyFrontendHandler,
             Tresor::Frontend::HTTPEncryptingRelayFrontendHandler,
             Tresor::Frontend::HTTPRelayFrontendHandler
         ]
@@ -38,7 +41,7 @@ module Tresor::Proxy
     attr :client_port
 
     # The current TRESOR proxy instance
-    # @return [Tresor::Proxy::Proxy]
+    # @return [Tresor::Proxy::TresorProxy]
     attr :proxy
 
     # The handler, which is used to serve the client request.
@@ -55,6 +58,8 @@ module Tresor::Proxy
 
       # Create backend as soon as all headers are complete
       http_parser.on_headers_complete = proc do
+        @cookies, @query_vars = nil, nil
+
         log.debug (log_key) {"Headers complete. Request is #{@http_parser.http_method} #{@http_parser.request_url} HTTP/1.1"}
 
         decide_frontend_handler
@@ -76,6 +81,8 @@ module Tresor::Proxy
 
       throw Exception.new("No frontend handler can handle request!") unless frontend_handler_class
 
+      log.debug (log_key) { "Set frontend handler to #{frontend_handler_class.name}" }
+
       @frontend_handler = frontend_handler_class.new(self)
     end
 
@@ -90,7 +97,14 @@ module Tresor::Proxy
 
       puts "\r\n#{data}" if proxy.output_raw_data
 
-      http_parser << data
+      begin
+        http_parser << data
+      rescue Exception => e
+        log.error e
+        log.debug data
+
+        send_error_response e.message
+      end
     end
 
     def unbind
@@ -112,6 +126,42 @@ module Tresor::Proxy
 
     def log_key
       "#{@proxy.name} - Client #{@client_ip}:#{@client_port}"
+    end
+
+    # Uses the HTTP parser to parse the cookies
+    # @return [Hash] Cookies as Hash
+    def cookies
+      unless @cookies
+        @cookies = {}
+
+        http_cookie_header = http_parser.headers['Cookie']
+
+        if http_cookie_header
+          http_cookie_header.split(';').each do |cookie|
+            key_value = cookie.split('=')
+
+            @cookies[key_value[0]] = key_value[1]
+          end
+        end
+      end
+
+      @cookies
+    end
+
+    # Parses the query vars
+    # @return [Hash{String => String}]
+    def query_vars
+      unless @query_vars
+        http_query = URI.parse(http_parser.request_url).query
+
+        if http_query
+          @query_vars = Hash[[http_query.split('=')]]
+        else
+          @query_vars = {}
+        end
+      end
+
+      @query_vars
     end
   end
 end

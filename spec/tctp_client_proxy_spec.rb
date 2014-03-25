@@ -9,7 +9,7 @@ require 'rack-tctp'
 
 describe 'A tctp client proxy' do
   before(:all) do
-    @proxy = Tresor::Proxy::TresorProxy.new '127.0.0.1', '43213', 'TCTP client proxy'
+    @proxy = Tresor::Proxy::TresorProxy.new '127.0.0.1', 'proxy.local', '43213', 'TCTP client proxy'
 
     @proxy.is_tctp_client = true
 

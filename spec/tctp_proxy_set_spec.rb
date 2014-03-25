@@ -10,8 +10,8 @@ describe 'A set of tctp proxies' do
   before(:all) do
     puts "Before a set of tctp proxies"
 
-    @first_proxy = Tresor::Proxy::TresorProxy.new '127.0.0.1', '43210', 'First TCTP proxy'
-    @second_proxy = Tresor::Proxy::TresorProxy.new '127.0.0.1', '43211', 'Second TCTP proxy'
+    @first_proxy = Tresor::Proxy::TresorProxy.new '127.0.0.1', 'proxy.local', '43210', 'First TCTP proxy'
+    @second_proxy = Tresor::Proxy::TresorProxy.new '127.0.0.1', 'proxy.local', '43211', 'Second TCTP proxy'
 
     @first_proxy.is_tctp_client = true
 

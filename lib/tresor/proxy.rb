@@ -3,8 +3,8 @@ module Tresor
   module Proxy
     extend ActiveSupport::Autoload
 
-    autoload :Connection
     autoload :TresorProxy
+    autoload :Connection
     autoload :ConnectionPool
   end
 end

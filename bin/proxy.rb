@@ -1,4 +1,5 @@
-require_relative '../lib/tresor_proxy'
+$LOAD_PATH << File.realpath(File.join(File.dirname(File.realpath(__FILE__)), '..', 'lib'))
+require 'tresor'
 
 require 'eventmachine'
 require 'slop'
@@ -10,6 +11,7 @@ opts = Slop.parse do
 
   on 'i=', 'ip', 'The ip address to bind to (default: all)'
   on 'p=', 'port', 'The port number (default: 80)'
+  on 'h=', 'hostname', 'The HTTP hostname of the proxy'
   on 's=', 'threadpool', 'The Eventmachine thread pool size (default: 20)'
   on 't', 'trace', 'Enable tracing'
   on 'l=', 'loglevel', 'Specify log level (FATAL, ERROR, WARN, INFO, DEBUG - default INFO)'
@@ -17,16 +19,20 @@ opts = Slop.parse do
   on 'r', 'tctp_server', 'Enable TCTP server'
   on 'y=', 'reverse_yaml', 'Load reverse proxy settings from YAML file'
   on 'x', 'raw_output', 'Output RAW data on console'
+  on 'sso', 'sso', 'Perform claims based authentication'
+  on 'fpurl', 'fpurl', 'The SSO federation provider URL'
+  on 'hrurl', 'hrurl', 'The SSO home realm URL'
 end
 
 EventMachine.threadpool_size = opts[:threadpool] || 20
 
-proxy = Tresor::TresorProxy.new(opts[:ip] || '0.0.0.0', opts[:port] || '80')
+proxy = Tresor::Proxy::TresorProxy.new(opts[:ip] || '0.0.0.0', opts[:hostname] || 'proxy.local', opts[:port] || '80')
 
 proxy.log.level = Logger.const_get(opts[:loglevel] || 'INFO')
 
 proxy.is_tctp_client = opts[:tctp_client]
 proxy.is_tctp_server = opts[:tctp_server]
+proxy.is_sso_enabled = opts[:sso]
 proxy.output_raw_data = opts[:raw_output]
 
 if opts[:reverse_yaml]

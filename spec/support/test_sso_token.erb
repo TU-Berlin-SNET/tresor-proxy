@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<trust:RequestSecurityTokenResponseCollection xmlns:trust="http://docs.oasis-open.org/ws-sx/ws-trust/200512">
+  <trust:RequestSecurityTokenResponse>
+    <trust:Lifetime>
+      <wsu:Created xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">2014-03-17T16:59:12.095Z</wsu:Created>
+      <wsu:Expires xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">2014-03-17T17:59:12.095Z</wsu:Expires>
+    </trust:Lifetime>
+    <wsp:AppliesTo xmlns:wsp="http://schemas.xmlsoap.org/ws/2004/09/policy">
+      <wsa:EndpointReference xmlns:wsa="http://www.w3.org/2005/08/addressing">
+        <wsa:Address>http://localhost/</wsa:Address>
+      </wsa:EndpointReference>
+    </wsp:AppliesTo>
+    <trust:RequestedSecurityToken>
+      <Assertion ID="_c047a37e-d749-4f87-ab05-d9a9751359a4" IssueInstant="2014-03-17T16:59:12.105Z" Version="2.0" xmlns="urn:oasis:names:tc:SAML:2.0:assertion">
+        <Issuer>tresor</Issuer>
+        <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+          <SignedInfo>
+            <CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" />
+            <SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256" />
+            <Reference URI="#_c047a37e-d749-4f87-ab05-d9a9751359a4">
+              <Transforms>
+                <Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" />
+                <Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" />
+              </Transforms>
+              <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256" />
+              <DigestValue>owDE1XwV9AHZ9oQfCofru0Av++jX+ox5aS7mDztB0mY=</DigestValue>
+            </Reference>
+          </SignedInfo>
+          <SignatureValue>SM0Jxi+30/dycmhErRH0p1LlM5GHqOwwzmg6lNJ/vqDAgYM91qIu/B0DL5wH2/NA3nSfiGl7YfQFLv8K5u6rSUM5ZXbxs9auaF7y+zfJwnHUUSAc5q4f5IZW0utzL1xskMnoBYtBdDJzgw5fWItp1H44j1OlKWVNIhOg8Ff84O9B51ykc6Q+p8YT4lZmqr/AK1TcuT1JvH5kMmjMO/YgvFTZ1TNi3fjowpCJCe38zmTIsOPsk2GXw5sTKPlF1Q0fTiam8WrvYwSY3BCaQCL4cCtUL8e+s/5G8rbfTGPZb4WEUOpzyo85SdK6hBYY1OnF61a9LFAYJOIPafuH3vcz1Q==</SignatureValue>
+          <KeyInfo>
+            <X509Data>
+              <X509Certificate>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</X509Certificate>
+            </X509Data>
+          </KeyInfo>
+        </Signature>
+        <Subject>
+          <NameID>Administrator@herz.tresor.dev</NameID>
+          <SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer" />
+        </Subject>
+        <Conditions NotBefore="2014-03-17T16:59:12.095Z" NotOnOrAfter="2014-03-17T17:59:12.095Z">
+          <AudienceRestriction>
+            <Audience>http://localhost/</Audience>
+          </AudienceRestriction>
+        </Conditions>
+        <AttributeStatement>
+          <Attribute Name="http://schemas.microsoft.com/ws/2008/06/identity/claims/role" a:OriginalIssuer="herz" xmlns:a="http://schemas.xmlsoap.org/ws/2009/09/identity/claims">
+            <AttributeValue>Domain Admins</AttributeValue>
+            <AttributeValue>Domain Users</AttributeValue>
+            <AttributeValue>Schema Admins</AttributeValue>
+            <AttributeValue>Enterprise Admins</AttributeValue>
+            <AttributeValue>Group Policy Creator Owners</AttributeValue>
+          </Attribute>
+          <Attribute Name="http://schemas.microsoft.com/ws/2008/06/identity/claims/windowsaccountname" a:OriginalIssuer="herz" xmlns:a="http://schemas.xmlsoap.org/ws/2009/09/identity/claims">
+            <AttributeValue>Administrator@herz.tresor.dev</AttributeValue>
+          </Attribute>
+          <Attribute Name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn" a:OriginalIssuer="herz" xmlns:a="http://schemas.xmlsoap.org/ws/2009/09/identity/claims">
+            <AttributeValue>Administrator@herz.tresor.dev</AttributeValue>
+          </Attribute>
+          <Attribute Name="http://schemas.fabrikam.com/claims/2009/08/organization">
+            <AttributeValue>Litware</AttributeValue>
+          </Attribute>
+        </AttributeStatement>
+        <AuthnStatement AuthnInstant="2014-03-17T11:53:29.295Z">
+          <AuthnContext>
+            <AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</AuthnContextClassRef>
+          </AuthnContext>
+        </AuthnStatement>
+      </Assertion>
+    </trust:RequestedSecurityToken>
+    <trust:RequestedAttachedReference>
+      <SecurityTokenReference d4p1:TokenType="http://docs.oasis-open.org/wss/oasis-wss-saml-token-profile-1.1#SAMLV2.0" xmlns:d4p1="http://docs.oasis-open.org/wss/oasis-wss-wssecurity-secext-1.1.xsd" xmlns="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
+        <KeyIdentifier ValueType="http://docs.oasis-open.org/wss/oasis-wss-saml-token-profile-1.1#SAMLID">_c047a37e-d749-4f87-ab05-d9a9751359a4</KeyIdentifier>
+      </SecurityTokenReference>
+    </trust:RequestedAttachedReference>
+    <trust:RequestedUnattachedReference>
+      <SecurityTokenReference d4p1:TokenType="http://docs.oasis-open.org/wss/oasis-wss-saml-token-profile-1.1#SAMLV2.0" xmlns:d4p1="http://docs.oasis-open.org/wss/oasis-wss-wssecurity-secext-1.1.xsd" xmlns="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
+        <KeyIdentifier ValueType="http://docs.oasis-open.org/wss/oasis-wss-saml-token-profile-1.1#SAMLID">_c047a37e-d749-4f87-ab05-d9a9751359a4</KeyIdentifier>
+      </SecurityTokenReference>
+    </trust:RequestedUnattachedReference>
+    <trust:TokenType>urn:oasis:names:tc:SAML:2.0:assertion</trust:TokenType>
+    <trust:RequestType>http://docs.oasis-open.org/ws-sx/ws-trust/200512/Issue</trust:RequestType>
+    <trust:KeyType>http://docs.oasis-open.org/ws-sx/ws-trust/200512/Bearer</trust:KeyType>
+  </trust:RequestSecurityTokenResponse>
+</trust:RequestSecurityTokenResponseCollection>

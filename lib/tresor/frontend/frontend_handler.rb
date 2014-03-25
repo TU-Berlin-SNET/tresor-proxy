@@ -1,9 +1,11 @@
 module Tresor
   module Frontend
     class FrontendHandler
+      # The client connection
+      # @return [Tresor::Proxy::Connection]
       attr_reader :connection
 
-      # @param [EventMachine::Connection] connection
+      # @param [Tresor::Proxy::Connection] connection
       def initialize(connection)
         @connection = connection
       end
@@ -17,7 +19,7 @@ module Tresor
       end
 
       def log_key
-        self.class.name
+        "#{connection.log_key} - #{self.class.name.demodulize}"
       end
     end
   end

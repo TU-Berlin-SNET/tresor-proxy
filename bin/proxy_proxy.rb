@@ -1,3 +1,5 @@
+$LOAD_PATH << File.realpath(File.join(File.dirname(File.realpath(__FILE__)), '..', 'lib'))
+
 require 'ruby-prof'
 require 'eventmachine'
 

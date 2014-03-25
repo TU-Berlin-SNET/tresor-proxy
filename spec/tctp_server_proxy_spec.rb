@@ -9,7 +9,7 @@ require 'rack-tctp'
 
 describe 'A tctp server proxy' do
   before(:all) do
-    @proxy = Tresor::Proxy::TresorProxy.new '127.0.0.1', '43215', 'TCTP server proxy'
+    @proxy = Tresor::Proxy::TresorProxy.new '127.0.0.1', 'proxy.local', '43215', 'TCTP server proxy'
 
     @proxy.is_tctp_server = true
     @proxy.reverse_mappings = { '127.0.0.1' => 'http://127.0.0.1:43216' }

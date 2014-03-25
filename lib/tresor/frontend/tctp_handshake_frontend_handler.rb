@@ -13,7 +13,7 @@ module Tresor
         super(connection)
 
         # Get HALEC URL
-        halec_url = URI("http://#{connection.proxy.host}:#{connection.proxy.port}#{connection.http_parser.request_url}")
+        halec_url = URI("http://#{connection.proxy.hostname}:#{connection.proxy.port}#{connection.http_parser.request_url}")
 
         # TCTP handshake
         @server_halec = connection.proxy.halec_registry.halecs(:server)[halec_url]

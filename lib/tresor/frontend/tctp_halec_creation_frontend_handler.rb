@@ -24,7 +24,7 @@ module Tresor
         EM.defer do
           @server_halec.engine.inject @handshake_data.join
 
-          halec_url = URI("http://#{connection.proxy.host}:#{connection.proxy.port}/halecs/#{Rack::TCTP::ServerHALEC.new_slug}")
+          halec_url = URI("http://#{connection.proxy.hostname}:#{connection.proxy.port}/halecs/#{Rack::TCTP::ServerHALEC.new_slug}")
 
           @server_halec.engine.read
           handshake_response = @server_halec.engine.extract

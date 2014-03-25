@@ -2,6 +2,8 @@ require 'active_support'
 require 'eventmachine'
 require 'http_parser'
 
+ActiveSupport::Dependencies.autoload_paths += [File.dirname(File.realpath(__FILE__))]
+
 ##
 #
 # Author::  Mathias Slawik (mailto:mathias.slawik@tu-berlin.de)

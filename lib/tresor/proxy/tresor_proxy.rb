@@ -4,29 +4,60 @@ module Tresor::Proxy
   class TresorProxy
     @@logger = Logger.new(STDOUT)
 
-    attr :host
+    # The IP this proxy should listen to
+    # @return [Integer]
+    # @!attr [r] ip
+    attr :ip
+
+    # The primary HTTP hostname of this proxy
+    # @return [String]
+    # @!attr [r] hostname
+    attr :hostname
+
+    # The port, on which this proxy should listen
+    # @return [Integer]
+    # @!attr [r] port
     attr :port
 
     # Does this proxy encrypt messages upstream?
-    #
     # !@attr [rw] is_tctp_client
-    # @return [Boolean] Does this proxy encrypt messages upstream?
+    # @return [Boolean]
     attr_accessor :is_tctp_client
 
     # Does this proxy decrypt incoming messages?
-    #
     # !@attr [rw] is_tctp_server
-    # @return [Boolean] Does this proxy decrypt incoming messages?
+    # @return [Boolean]
     attr_accessor :is_tctp_server
 
+    # Does the proxy perform Single-Sign-On?
+    # !@attr [rw] is_sso_enabled
+    # @return [Boolean]
+    attr_accessor :is_sso_enabled
+
+    # Does this proxy output raw data on the console?
+    # !@attr [rw] output_raw_data
+    # @return [Boolean]
     attr_accessor :output_raw_data
 
     # Mapping from URLs to reverse hosts, e.g. `{'google.local' => 'http://www.google.com'}`
-    #
     # !@attr [rw] reverse_mappings
     # @return [Hash{String => String}] Mappings for reverse hosts.
     attr_accessor :reverse_mappings
 
+    # SSO Federation Provider URL
+    # !@attr [rw] fpurl
+    # @return [String]
+    attr_accessor :fpurl
+
+    # SSO Home Realm URL
+    # !@attr [rw] hrurl
+    # @return [String]
+    attr_accessor :hrurl
+
+    # The SSO sessions.
+    # !@attr [rw] sso_sessions
+    # @return [Hash[String => String]] A mapping of SSO session ID to ClaimSSOSecurityToken
+    attr_accessor :sso_sessions
 
     attr_accessor :connection_pool
     attr_accessor :halec_registry
@@ -51,13 +82,15 @@ module Tresor::Proxy
     # @return [EventMachine::DefaultDeferrable]
     attr :stop_callback
 
-    def initialize(host, port, name = "TRESOR Proxy")
-      @host = host
+    def initialize(ip, hostname, port, name = "TRESOR Proxy")
+      @ip = ip
+      @hostname = hostname
       @port = port
       @name = name
       @connection_pool = ConnectionPool.new(self)
       @halec_registry = Tresor::TCTP::HALECRegistry.new
       @reverse_mappings = {}
+      @sso_sessions = {}
 
       @start_callback = EventMachine::DefaultDeferrable.new
       @start_callback.callback do
@@ -85,9 +118,9 @@ module Tresor::Proxy
             end
           end
 
-          EventMachine::start_server(@host, @port, Connection, self)
+          EventMachine::start_server(@ip, @port, Connection, self)
 
-          log.info { "#{@name} started on #{@host}:#{@port}" }
+          log.info { "#{@name} started on #{@ip}:#{@port}" }
 
           start_callback.succeed
         end
