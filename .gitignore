@@ -1,7 +1,7 @@
 .yardoc
 doc
 profiles
-spec/*.txt
+spec/**.txt
 Gemfile.lock
 .idea
 profile-results

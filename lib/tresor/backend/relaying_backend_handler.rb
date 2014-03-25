@@ -96,6 +96,8 @@ module Tresor
       end
 
       def on_backend_message_complete
+        relay "0\r\n\r\n" if @http_parser.headers['Transfer-Encoding'].eql? 'chunked'
+
         @backend.free_backend
       end
 
