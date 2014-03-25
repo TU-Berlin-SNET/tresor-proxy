@@ -70,7 +70,7 @@ module Tresor
         case headers
           when Hash
             headers.each do |header, value|
-              relay "#{header}: #{value}\r\n"
+              [value].flatten.each do |v| relay "#{header}: #{v}\r\n" end
             end
           when Array
             headers.each do |header_hash|
