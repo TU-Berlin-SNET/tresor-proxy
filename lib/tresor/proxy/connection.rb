@@ -103,7 +103,7 @@ module Tresor::Proxy
         log.error e
         log.debug data
 
-        send_error_response e.message
+        send_error_response e
       end
     end
 
@@ -111,11 +111,12 @@ module Tresor::Proxy
       log.debug (log_key) { 'closed' }
     end
 
+    # @param [Exception] error
     def send_error_response(error)
       send_data "HTTP/1.1 502 Bad Gateway\r\n"
-      send_data "Content-Length: #{error.size}\r\n"
+      send_data "Content-Length: #{error.message.size}\r\n"
       send_data "\r\n"
-      send_data error
+      send_data error.message
     end
 
     def send_data(data)

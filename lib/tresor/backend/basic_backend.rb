@@ -38,18 +38,24 @@ module Tresor
         print "#{data}" if proxy.output_raw_data
 
         @receive_data_future.callback do |backend_handler|
-          backend_handler.receive_data data
+          EM.schedule do
+            backend_handler.receive_data data
+          end
         end
       end
 
       def unbind
+        if @backend_handler && @backend_handler.respond_to?(:on_unbind)
+          @backend_handler.on_unbind
+        end
 
+        proxy.connection_pool.backend_unbind(self)
       end
 
       def free_backend
         reset_backend_handler
 
-        proxy.connection_pool.backend_unbind(self)
+        proxy.connection_pool.backend_free(@connection_pool_key, self)
       end
 
       # Receives current client request
@@ -63,6 +69,8 @@ module Tresor
       end
 
       def decide_handler
+        log.debug (log_key) { "Deciding Handler" }
+
         if proxy.is_tctp_client
           if Tresor::TCTP.tctp_status_known?(@host)
             if Tresor::TCTP.is_tctp_server?(@host) && Tresor::TCTP.is_tctp_protected?(@host, @client_path)
@@ -91,7 +99,9 @@ module Tresor
       # is established and is ready for use
       def client_chunk(chunk)
         @client_chunk_future.callback do |backend_handler|
-          backend_handler.client_chunk chunk
+          EM.schedule do
+            backend_handler.client_chunk chunk
+          end
         end
       end
 
@@ -104,7 +114,7 @@ module Tresor
       end
 
       def log_key
-        "#{proxy.name} - Backend #{@connection_pool_key} #{@host} - Thread #{Thread.current.__id__}"
+        "#{proxy.name} - Backend #{@connection_pool_key} #{@host} - Thread #{Thread.list.index(Thread.current)}"
       end
 
       def send_data(data)

@@ -18,21 +18,20 @@ describe 'A basic forward proxy' do
       run BASIC_FORWARD_TEST_SERVER
     end
 
-    @webrick_server = WEBrick::HTTPServer.new({:BindAddress => '127.0.0.1', :Port => 43209})
-    @webrick_server.mount '/', Rack::Handler::WEBrick, @rack_stack.to_app
+    @thin_server = Thin::Server.new '127.0.0.1', 43209, @rack_stack.to_app
 
     Thread.new do @proxy.start end
-    Thread.new do @webrick_server.start end
+    Thread.new do @thin_server.start end
     until @proxy.started do Thread.pass end
-    until @webrick_server.status.eql? :Running do sleep 0.1 end
+    until @thin_server.running? do Thread.pass end
   end
 
   after(:all) do
     @proxy.stop
     @thin_server.stop
 
-    while @proxy.started do sleep 0.1 end
-    until @webrick_server.status.eql? :Stop do sleep 0.1 end
+    while @proxy.started do Thread.pass end
+    while @thin_server.running? do Thread.pass end
   end
 
   let :proxy_uri do
@@ -57,6 +56,38 @@ describe 'A basic forward proxy' do
     response = http.request request
 
     expect(response.code).to eq '502'
+  end
+
+  it 'can be accessed in parallel' do
+    threadgroup = ThreadGroup.new
+
+    finished = 0
+
+    5.times do
+      threadgroup.add(Thread.new do
+        5.times do
+          http = Net::HTTP.new(proxy_uri.host, proxy_uri.port)
+          request = Net::HTTP::Post.new(request_uri)
+
+          @test_server.current_post_body = test_body
+          request.body = test_body
+
+          response = http.request request
+
+          expect(response.code).to eq '200'
+          expect(response.body.length).to eq test_body.length
+          expect(response.body).to eq test_body
+
+          finished += 1
+        end
+      end)
+    end
+
+    until threadgroup.list.all? {|thread| thread.status.eql? false} do
+      sleep 0.1
+    end
+
+    expect(finished).to be 25
   end
 
   it_behaves_like 'a TRESOR proxy' do

@@ -5,10 +5,12 @@ module Tresor::Proxy
   class ConnectionPool
     attr_reader :free_backends
     attr_reader :proxy
+    attr_reader :pool_mutex
 
     def initialize(proxy)
       @proxy = proxy
       @free_backends = {}
+      @pool_mutex = Mutex.new
     end
 
     def get_backend_future(connection)
@@ -51,9 +53,14 @@ module Tresor::Proxy
 
           connection_key = "#{ip}:#{port}"
 
-          @free_backends[connection_key] ||= []
+          backend = nil
 
-          backend = @free_backends[connection_key].pop
+          @pool_mutex.synchronize do
+            @free_backends[connection_key] ||= []
+
+            backend = @free_backends[connection_key].pop
+          end
+
           if backend.nil?
             backend = EventMachine::connect(ip, port, Tresor::Backend::BasicBackend, client_connection, http_hostname, connection_key)
 
@@ -65,9 +72,9 @@ module Tresor::Proxy
           parsed_uri = URI.parse(client_connection.http_parser.request_url)
           parsed_uri.path = '/' if parsed_uri.path.eql?('')
 
-          backend.client_request client_connection.http_parser.http_method, parsed_uri.path, parsed_uri.query, client_connection.http_parser.headers
-
           EM.schedule do
+            backend.client_request client_connection.http_parser.http_method, parsed_uri.path, parsed_uri.query, client_connection.http_parser.headers
+
             backend_future.succeed backend
           end
         rescue SocketError => e

@@ -47,6 +47,7 @@ module Tresor
         log.debug (log_key) {"Received #{data.size} bytes from backend."}
 
         log.debug (log_key) {"Relaying #{data.size} bytes directly to client."}
+
         connection.send_data data
       end
 

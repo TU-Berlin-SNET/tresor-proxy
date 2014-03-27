@@ -8,6 +8,8 @@ class Tresor::Backend::TCTPDiscoveryBackendHandler < Tresor::Backend::BackendHan
     @tctp_discovery_information = Tresor::TCTP::DiscoveryInformation.new
 
     @http_parser.on_headers_complete = proc do |headers|
+      @headers = headers
+
       if @http_parser.status_code == 200 && headers['Content-Type'].eql?('text/prs.tctp-discovery')
         log.info (log_key) { "Host #{@backend.host} (#{@backend.connection_pool_key} is TCTP capable!" }
 

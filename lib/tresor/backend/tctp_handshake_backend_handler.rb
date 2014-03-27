@@ -6,6 +6,7 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
 
     @http_parser = HTTP::Parser.new
     @http_parser.on_headers_complete = proc do |headers|
+      # TODO Error handling in handshake, e.g., fallback to regular or send error
       if headers['Location']
         @halec.url = URI(headers['Location'])
         log.debug (log_key) {"Got new HALEC url: #{@halec.url}"}
@@ -24,21 +25,21 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
       log.debug (log_key) {"Got #{chunk.length} bytes handshake response in HTTP body"}
 
       @halec.engine.inject chunk
+      @halec.engine.read
+
+      if(@halec.engine.state.eql? 'SSLOK ')
+        log.debug (log_key) { "TCTP Handshake complete. HALEC #{@halec.url} ready for encrypting data"}
+
+        @backend.proxy.halec_registry.register_halec @handshake_url, @halec
+      end
     end
 
     @http_parser.on_message_complete = proc do |env|
-      @halec.engine.read
       handshake_response = @halec.engine.extract
 
       log.debug (log_key) { "POSTing #{handshake_response.length} bytes client handshake response to HALEC URL #{@halec.url}" }
 
-      @http_parser.reset!
-
       @http_parser.on_message_complete = proc do
-        log.debug (log_key) { "TCTP Handshake complete. HALEC #{@halec.url} ready for encrypting data"}
-
-        @backend.proxy.halec_registry.register_halec @handshake_url, @halec
-
         @backend.decide_handler
       end
 

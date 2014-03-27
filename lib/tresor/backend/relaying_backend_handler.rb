@@ -82,21 +82,28 @@ module Tresor
       def on_backend_headers_complete(headers)
         relay "HTTP/1.1 #{@http_parser.status_code}\r\n"
 
+        # Thats better
+        headers.delete('Content-Length') if headers['Transfer-Encoding']
+
+        if(headers['Connection'])
+          puts headers['Connection']
+        end
+
         relay_backend_headers headers
 
         relay "\r\n"
       end
 
       def on_backend_body(chunk)
-        if @http_parser.headers['Content-Length']
-          relay chunk
-        else
+        if @http_parser.headers['Transfer-Encoding'] && @http_parser.headers['Transfer-Encoding'].eql?('chunked')
           relay_as_chunked chunk
+        else
+          relay chunk
         end
       end
 
       def on_backend_message_complete
-        relay "0\r\n\r\n" if @http_parser.headers['Transfer-Encoding'].eql? 'chunked'
+        relay "0\r\n\r\n" if @http_parser.headers['Transfer-Encoding'] && @http_parser.headers['Transfer-Encoding'].eql?('chunked')
 
         @backend.free_backend
       end

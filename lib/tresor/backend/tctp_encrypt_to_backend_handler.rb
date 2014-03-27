@@ -25,8 +25,11 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
       next if header.eql?('Accept-Encoding') || header.eql?('Content-Length')
 
       if header.eql?('Cookie') && tctp_cookie
-        headers << {'Cookie' => "#{value}; #{tctp_cookie}"}
+        headers << {'Cookie' => "#{value};#{tctp_cookie}"}
         tctp_cookie_sent = true
+
+        # Do not send double cookies
+        next
       end
 
       # Send Host header of reverse URL
@@ -53,28 +56,27 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
   def on_backend_headers_complete(backend_headers)
     relay "HTTP/1.1 #{@http_parser.status_code}\r\n"
 
+    @encrypted_response = backend_headers['Content-Encoding'] && backend_headers['Content-Encoding'].eql?('encrypted')
+
+    @has_body = backend_headers['Transfer-Encoding'] || backend_headers['Content-Length']
+
     headers = []
     backend_headers.each do |header, value|
-      if %w[Transfer-Encoding Content-Length].include? header
-        @has_body = true
-
-        headers << {header => value}
-
+      # TODO merge Content-Encodings
+      if @encrypted_response && %w[Transfer-Encoding Content-Encoding Content-Length].include?(header)
         next
       end
 
-      if header.eql? 'Content-Encoding'
-        @encrypted_response = value.eql? 'encrypted'
-      else
-        headers << {header => value}
-      end
+      headers << {header => value}
     end
 
-    unless @encrypted_response
+    if @encrypted_response
+      headers << {'Transfer-Encoding' => 'chunked'}
+    else
       log.warn (log_key) {"Got unencrypted response from #{backend.host} (#{backend.connection_pool_key}) for encrypted request #{build_start_line}!"}
-    end
 
-    headers << {'Transfer-Encoding' => 'chunked'} if @has_body
+      @halec_promise.return
+    end
 
     relay_backend_headers headers
 
@@ -116,8 +118,12 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
     if @encrypted_response
       finish_response
     else
-      relay "0\r\n\r\n"
+      relay "0\r\n\r\n" if @has_body
     end
+  end
+
+  def on_unbind
+    @halec_promise.return
   end
 
   def decrypt_and_relay(data)
@@ -139,11 +145,9 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
   def do_finish_response
     log.info (log_key) { 'Sending trailer to client' }
 
-    relay "0\r\n\r\n" if @has_body
+    @halec_promise.return
 
-    if @encrypted_response
-      @halec_promise.return
-    end
+    relay "0\r\n\r\n" if @has_body
 
     @backend.free_backend
   end
@@ -192,6 +196,6 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
   end
 
   def log_key
-    "#{@backend.proxy.name} - TCTP Encrypt to Backend handler"
+    "#{@backend.proxy.name} - #{@backend.log_key} - TCTP Encrypt to Backend handler"
   end
 end

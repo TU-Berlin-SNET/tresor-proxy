@@ -67,7 +67,7 @@ module Tresor
         end
 
         def return
-          @halec_registry.halecs(@handshake_url)[@promised_halec.url] = @promised_halec
+          @halec_registry.halecs(@handshake_url)[@promised_halec.url] = @promised_halec if @promised_halec
 
           @halec_registry.return_halec_promise(self)
 
