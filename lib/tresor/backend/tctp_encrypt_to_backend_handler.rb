@@ -58,7 +58,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
 
     @encrypted_response = backend_headers['Content-Encoding'] && backend_headers['Content-Encoding'].eql?('encrypted')
 
-    @has_body = backend_headers['Transfer-Encoding'] || backend_headers['Content-Length']
+    @has_body = backend_headers['Transfer-Encoding'] || (backend_headers['Content-Length'] && !backend_headers['Content-Length'].eql?("0"))
 
     headers = []
     backend_headers.each do |header, value|
