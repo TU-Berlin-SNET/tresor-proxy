@@ -16,7 +16,9 @@ describe 'A set of tctp proxies' do
     @first_proxy.is_tctp_client = true
 
     @second_proxy.is_tctp_server = true
-    @second_proxy.reverse_mappings = { '127.0.0.1' => 'http://127.0.0.1:43212' }
+    reverse_hash = {}
+    reverse_hash.default = 'http://127.0.0.1:43212'
+    @second_proxy.reverse_mappings = reverse_hash
 
     @test_server = Tresor::TestServer.new
 

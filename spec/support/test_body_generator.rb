@@ -15,7 +15,7 @@ module Tresor
         unless File.exists?(test_body_file)
           test_body = StringIO.new
 
-          (1..1000000).each do |x|
+          (1..100000).each do |x|
             test_body.write "#{x}:"
           end
 

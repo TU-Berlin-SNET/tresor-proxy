@@ -20,6 +20,7 @@ opts = Slop.parse do
   on 'y=', 'reverse_yaml', 'Load reverse proxy settings from YAML file'
   on 'x', 'raw_output', 'Output RAW data on console'
   on 'sso', 'sso', 'Perform claims based authentication'
+  on 'a', 'xacml', 'Perform XACML'
   on 'fpurl', 'fpurl', 'The SSO federation provider URL'
   on 'hrurl', 'hrurl', 'The SSO home realm URL'
 end

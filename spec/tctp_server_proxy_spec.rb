@@ -98,7 +98,7 @@ describe 'A tctp server proxy' do
     # Read the decrypted body
     decrypted_body = client_halec.decrypt_data body_stream.read
 
-    expect(decrypted_body).to eql('Success')
+    expect(decrypted_body).to eql('Success /')
 
     # Creates a POST body
     @test_server.current_post_body = test_body

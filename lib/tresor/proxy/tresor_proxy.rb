@@ -34,6 +34,11 @@ module Tresor::Proxy
     # @return [Boolean]
     attr_accessor :is_sso_enabled
 
+    # Does the proxy perform XACML authorization?
+    # !@attr [rw] is_xacml_enabled
+    # @return [Boolean]
+    attr_accessor :is_xacml_enabled
+
     # Does this proxy output raw data on the console?
     # !@attr [rw] output_raw_data
     # @return [Boolean]
@@ -59,7 +64,10 @@ module Tresor::Proxy
     # @return [Hash[String => String]] A mapping of SSO session ID to ClaimSSOSecurityToken
     attr_accessor :sso_sessions
 
-    attr_accessor :connection_pool
+    # The proxy connection pool
+    # !@attr [r] connection_pool
+    # @return [Tresor::Proxy::ConnectionPool]
+    attr :connection_pool
     attr_accessor :halec_registry
     attr_accessor :name
     attr_accessor :started

@@ -1,42 +1,30 @@
 module Tresor
   module Backend
     class RelayingBackendHandler < BackendHandler
+      #@return [Boolean] If the HTTP request has a body
+      #@!attr [r] request_has_body
+      attr :request_has_body
+
       def initialize(backend)
-        @backend = backend
+        super(backend)
 
-        @http_parser = HTTP::Parser.new
+        backend_connection_future.callback do |backend_connection|
+          send_headers_to_backend_connection
 
-        @http_parser.on_headers_complete = proc do |headers|
-          on_backend_headers_complete headers
-        end
+          @request_has_body = false
 
-        @http_parser.on_body = proc do |chunk|
-          on_backend_body chunk
-        end
-
-        @http_parser.on_message_complete = proc do |env|
-          on_backend_message_complete
-        end
-
-        send_request_to_backend
-
-        EM.schedule do
-          @backend.client_chunk_future.succeed self
-          @backend.receive_data_future.succeed self
+          backend.client_chunk_future.succeed self
         end
       end
 
-      def receive_data(data)
-        @http_parser << data
-      end
-
-      def send_request_to_backend
+      def send_headers_to_backend_connection
         start_line = build_start_line
 
         log.debug (log_key) { "Relaying to backend: #{start_line}" }
 
-        backend.send_data start_line
-        send_client_headers(backend.client_headers)
+        backend_connection.send_data start_line
+
+        send_client_headers(backend.client_connection.client_headers)
 
         #if(@backend.client_connection.query_vars['tresor_sso_id'])
         #  sso_id = @backend.client_connection.query_vars['tresor_sso_id']
@@ -46,18 +34,30 @@ module Tresor
         #  backend.send_data "TRESOR-Identity: #{sso_token.name_id}\r\n"
         #end
 
-        backend.send_data "\r\n"
+        backend_connection.send_data "\r\n"
       end
 
       def client_chunk(chunk)
-        backend.send_data chunk
+        @request_has_body = true
+
+        log.debug (log_key) { "Sending #{chunk.length} bytes to backend." }
+
+        backend_connection.send_data chunk
+      end
+
+      def on_client_message_complete
+        if @request_has_body
+          if backend.client_connection.http_parser.headers['Transfer-Encoding'].eql?('chunked')
+            send_client_trailer_chunk
+          end
+        end
       end
 
       def send_client_headers(headers)
         case headers
           when Hash
             headers.each do |header, value|
-              backend.send_data "#{header}: #{value}\r\n"
+              backend_connection.send_data "#{header}: #{value}\r\n"
             end
           when Array
             headers.each do |header_hash|
@@ -80,7 +80,7 @@ module Tresor
       end
 
       def on_backend_headers_complete(headers)
-        relay "HTTP/1.1 #{@http_parser.status_code}\r\n"
+        relay "HTTP/1.1 #{backend_connection.http_parser.status_code}\r\n"
 
         # Thats better
         headers.delete('Content-Length') if headers['Transfer-Encoding']
@@ -94,8 +94,12 @@ module Tresor
         relay "\r\n"
       end
 
+      def client_transfer_chunked?
+        backend_connection.http_parser.headers['Transfer-Encoding'] && backend_connection.http_parser.headers['Transfer-Encoding'].eql?('chunked')
+      end
+
       def on_backend_body(chunk)
-        if @http_parser.headers['Transfer-Encoding'] && @http_parser.headers['Transfer-Encoding'].eql?('chunked')
+        if client_transfer_chunked?
           relay_as_chunked chunk
         else
           relay chunk
@@ -103,9 +107,7 @@ module Tresor
       end
 
       def on_backend_message_complete
-        relay "0\r\n\r\n" if @http_parser.headers['Transfer-Encoding'] && @http_parser.headers['Transfer-Encoding'].eql?('chunked')
-
-        @backend.free_backend
+        relay "0\r\n\r\n" if client_transfer_chunked?
       end
 
       def log_key

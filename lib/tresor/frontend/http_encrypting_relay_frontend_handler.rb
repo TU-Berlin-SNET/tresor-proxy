@@ -50,15 +50,13 @@ module Tresor
 
       def on_message_complete
         if @has_request_body
-          @backend_future.callback do |backend|
-            log.debug (log_key) { 'Sent encrypted backend response to client.' }
+          log.debug (log_key) { 'Sent encrypted backend response to client.' }
 
-            backend.client_chunk "0\r\n\r\n" if connection.http_parser.headers['Transfer-Encoding'].eql? 'chunked'
+          backend.client_chunk "0\r\n\r\n" if connection.http_parser.headers['Transfer-Encoding'].eql? 'chunked'
 
-            connection.proxy.halec_registry.halecs(:server)[@server_halec.url] = @server_halec
+          connection.proxy.halec_registry.halecs(:server)[@server_halec.url] = @server_halec
 
-            @server_halec = nil
-          end
+          @server_halec = nil
         end
       end
 

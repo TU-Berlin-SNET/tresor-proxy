@@ -14,7 +14,7 @@ describe 'An SSO proxy' do
     @proxy.is_sso_enabled = true
     @proxy.fpurl = 'http://federation-provider.local'
     @proxy.hrurl = 'http://home-realm.local'
-    @proxy.reverse_mappings = {'webrick.local' => 'http://127.0.0.1:43218'}
+    @proxy.reverse_mappings = {nil => 'http://127.0.0.1:43218'}
 
     SSO_TEST_SERVER = Tresor::SSOTestServer.new
     @test_server = SSO_TEST_SERVER

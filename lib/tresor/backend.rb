@@ -3,7 +3,7 @@ module Tresor
     extend ActiveSupport::Autoload
 
     autoload :BackendHandler
-    autoload :BasicBackend
+    autoload :Backend
     autoload :RelayingBackendHandler
     autoload :TCTPDiscoveryBackendHandler
     autoload :TCTPEncryptToBackendHandler

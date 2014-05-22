@@ -8,38 +8,27 @@ module Tresor
         end
       end
 
-      attr_accessor :backend_future
+      attr_accessor :backend
 
       # Initializes this HTTP relay handler by getting a backend future
       # @param [EventMachine::Connection] connection The client connection
       def initialize(connection)
         super(connection)
 
-        @backend_future = connection.proxy.connection_pool.get_backend_future(connection)
-
-        @backend_future.errback do |error|
-          connection.send_error_response(error)
-          connection.close_connection_after_writing
-        end
-
         @has_request_body = false
+
+        @backend = Tresor::Backend::Backend.new(connection)
       end
 
       # Sends any client chunk directly to backend.
       def on_body(chunk)
         @has_request_body = true
 
-        @backend_future.callback do |backend|
-          backend.client_chunk chunk
-        end
+        backend.client_chunk chunk
       end
 
       def on_message_complete
-        if @has_request_body
-          @backend_future.callback do |backend|
-            send_client_trailer_chunk if connection.http_parser.headers['Transfer-Encoding'].eql?('chunked') || backend.backend_handler.is_a?(Tresor::Backend::TCTPEncryptToBackendHandler)
-          end
-        end
+        backend.client_chunk :last
       end
 
       # Called from backend
@@ -52,9 +41,7 @@ module Tresor
       end
 
       def send_client_trailer_chunk
-        @backend_future.callback do |backend|
-          backend.client_chunk "0\r\n\r\n"
-        end
+        backend.client_chunk "0\r\n\r\n"
       end
     end
   end

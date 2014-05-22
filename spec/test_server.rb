@@ -15,6 +15,8 @@ module Tresor
           input_string = input.string
 
           if current_post_body.eql? input_string
+            puts 'POST Request OK. Sending back input.'
+
             [ 200, {'Content-Type' => 'text/plain', 'Content-Length' => "#{input_string.length}"}, [input_string]]
           else
             IO.write(File.join(__dir__, 'test_body_expected.txt'), current_post_body)
@@ -23,7 +25,8 @@ module Tresor
             [ 500, {'Content-Type' => 'text/plain', 'Content-Length' => '30'}, ['Did not receive correct string']]
           end
         else
-          [ 200, {'Content-Type' => 'text/plain', 'Content-Length' => '7'}, ['Success']]
+          response = "Success #{env['REQUEST_PATH']}"
+          [ 200, {'Content-Type' => 'text/plain', 'Content-Length' => response.length.to_s}, [response]]
       end
     end
   end

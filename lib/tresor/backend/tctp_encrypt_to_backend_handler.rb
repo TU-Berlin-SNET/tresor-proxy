@@ -1,6 +1,6 @@
 class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBackendHandler
   # Initializes the Handler to encrypt to the +backend+ using the +halec_promise+ promise.
-  # @param backend [Tresor::Backend::BasicBackend] The backend
+  # @param backend [Tresor::Backend::Backend] The backend
   # @param halec_promise [Tresor::TCTP::HALECRegistry::HALECPromise] The promise
   def initialize(backend, halec_promise)
     @first_chunk = true
@@ -10,18 +10,18 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
     super(backend)
   end
 
-  def send_request_to_backend
+  def send_headers_to_backend_connection
     start_line = build_start_line
 
     log.debug (log_key) { "Encrypting to backend: #{start_line[0..-2]}" }
 
-    tctp_cookie = @backend.proxy.halec_registry.get_tctp_cookie(backend.host)
+    tctp_cookie = backend.proxy.halec_registry.get_tctp_cookie(backend.client_connection.host)
     tctp_cookie_sent = false
 
-    @backend.send_data start_line
+    backend_connection.send_data start_line
 
     headers = []
-    @backend.client_headers.each do |header, value|
+    backend.client_connection.client_headers.each do |header, value|
       next if header.eql?('Accept-Encoding') || header.eql?('Content-Length')
 
       if header.eql?('Cookie') && tctp_cookie
@@ -40,7 +40,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
       end
     end
 
-    if @backend.client_headers.has_key? 'Content-Length'
+    if backend.client_connection.client_headers.has_key? 'Content-Length'
       headers << {'Transfer-Encoding' => 'chunked'}
       headers << {'Content-Encoding' => 'encrypted'}
     end
@@ -50,11 +50,11 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
 
     send_client_headers headers
 
-    @backend.send_data "\r\n"
+    backend_connection.send_data "\r\n"
   end
 
   def on_backend_headers_complete(backend_headers)
-    relay "HTTP/1.1 #{@http_parser.status_code}\r\n"
+    relay "HTTP/1.1 #{backend_connection.http_parser.status_code}\r\n"
 
     @encrypted_response = backend_headers['Content-Encoding'] && backend_headers['Content-Encoding'].eql?('encrypted')
 
@@ -73,7 +73,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
     if @encrypted_response
       headers << {'Transfer-Encoding' => 'chunked'}
     else
-      log.warn (log_key) {"Got unencrypted response from #{backend.host} (#{backend.connection_pool_key}) for encrypted request #{build_start_line}!"}
+      log.warn (log_key) {"Got unencrypted response from #{backend.client_connection.host} (#{backend_connection.connection_pool_key}) for encrypted request #{build_start_line}!"}
 
       @halec_promise.return
     end
@@ -97,6 +97,8 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
 
         @halec = @halec_promise.redeem_halec(URI(body_halec_url))
 
+        #TODO Handle HALEC missing exception
+
         chunk_without_url = chunk[(first_newline_index + 2)..-1]
 
         unless chunk_without_url.eql?('')
@@ -113,7 +115,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
   end
 
   def on_backend_message_complete
-    log.debug (log_key) { "Finished receiving backend response to #{@backend.client_method} #{@backend.client_path}#{@backend.client_query_string ? "?#{@backend.client_query_string}": ''}." }
+    log.debug (log_key) { "Finished receiving backend response to #{backend.client_connection.http_method} #{backend.client_connection.path}#{backend.client_connection.query ? "?#{backend.client_connection.query}": ''}." }
 
     if @encrypted_response
       finish_response
@@ -148,45 +150,47 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
     @halec_promise.return
 
     relay "0\r\n\r\n" if @has_body
-
-    @backend.free_backend
   end
 
   def client_chunk(data)
-    if data[-5,5].eql? "0\r\n\r\n"
+    log.debug (log_key) { "Encrypting #{data.length} bytes to backend." }
+
+    @request_has_body = true
+
+    unless @halec
+      @halec = @halec_promise.redeem_halec
+
+      @halec_url_line = "#{@halec.url}\r\n"
+
+      chunk_length_as_hex = @halec_url_line.length.to_s(16)
+      chunk = "#{chunk_length_as_hex}\r\n#{@halec_url_line}\r\n"
+
+      backend_connection.send_data chunk
+    end
+
+    @halec.encrypt_data_async(data) do |encrypted_data|
+      EM.schedule do
+        chunk_length_as_hex = encrypted_data.length.to_s(16)
+
+        log.debug (log_key) { "Sending #{encrypted_data.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
+
+        chunk = "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
+
+        backend_connection.send_data chunk
+      end
+    end
+  end
+
+  def on_client_message_complete
+    if @request_has_body
       @halec.call_async do
         EM.schedule do
-          @backend.send_data "0\r\n\r\n"
-
-          @halec_promise.return
-        end
-      end
-    else
-      log.debug (log_key) { "Encrypting #{data.length} bytes to backend." }
-
-      unless @halec
-        @halec = @halec_promise.redeem_halec
-
-        @halec_url_line = "#{@halec.url}\r\n"
-
-        chunk_length_as_hex = @halec_url_line.length.to_s(16)
-        chunk = "#{chunk_length_as_hex}\r\n#{@halec_url_line}\r\n"
-
-        @backend.send_data chunk
-      end
-
-      @halec.encrypt_data_async(data) do |encrypted_data|
-        EM.schedule do
-          chunk_length_as_hex = encrypted_data.length.to_s(16)
-
-          log.debug (log_key) { "Sending #{encrypted_data.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
-
-          chunk = "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
-
-          @backend.send_data chunk
+          backend_connection.send_data "0\r\n\r\n"
         end
       end
     end
+
+    @halec_promise.return
   end
 
   def receive_data(data)

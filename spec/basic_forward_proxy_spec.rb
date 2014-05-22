@@ -63,13 +63,14 @@ describe 'A basic forward proxy' do
 
     finished = 0
 
-    5.times do
+    @test_server.current_post_body = test_body
+
+    2.times do
       threadgroup.add(Thread.new do
         5.times do
           http = Net::HTTP.new(proxy_uri.host, proxy_uri.port)
           request = Net::HTTP::Post.new(request_uri)
 
-          @test_server.current_post_body = test_body
           request.body = test_body
 
           response = http.request request
@@ -87,7 +88,7 @@ describe 'A basic forward proxy' do
       sleep 0.1
     end
 
-    expect(finished).to be 25
+    expect(finished).to be 10
   end
 
   it_behaves_like 'a TRESOR proxy' do

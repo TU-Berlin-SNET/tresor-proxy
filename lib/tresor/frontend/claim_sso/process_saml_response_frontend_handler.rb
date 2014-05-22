@@ -35,7 +35,7 @@ module Tresor
             connection.send_data "Location: #{build_wdycf_url(new_id)}\r\n\r\n"
             connection.send_data build_html_response(wdycf_url)
           else
-            connection.send_error_response 'SSO token missing'
+            connection.send_error_response Exception.new('SSO token missing')
           end
         end
 
