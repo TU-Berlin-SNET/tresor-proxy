@@ -8,4 +8,7 @@ class Rack::TCTP::HALEC
   # @!attr [rw] encrypted_proc
   # @return [Proc] encrypted_proc The Proc
   attr_accessor :encrypted_proc
+
+  # TCTP session cookie associated with this HALEC
+  attr_accessor :tctp_session_cookie
 end

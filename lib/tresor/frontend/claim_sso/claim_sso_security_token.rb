@@ -1,3 +1,5 @@
+require 'nokogiri'
+
 module Tresor
   module Frontend
     module ClaimSSO

@@ -58,7 +58,11 @@ shared_examples 'a TRESOR proxy' do
     @test_server.current_post_body = test_body
     request.body = test_body
 
-    response = http.request request
+    begin
+      response = http.request request
+    rescue Exception => e
+      fail(e)
+    end
 
     expect(response.code).to eq '200'
     expect(response.body.length).to eq test_body.length

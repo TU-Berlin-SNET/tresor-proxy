@@ -28,12 +28,16 @@ module Tresor
         halec_promises(promise.handshake_url).delete(promise)
       end
 
-      def get_tctp_cookie(host)
-        @tctp_cookies[host]
+      def get_tctp_cookies(host)
+        @tctp_cookies[host] || []
       end
 
       def register_tctp_cookie(host, cookie)
-        @tctp_cookies[host] = cookie
+        (@tctp_cookies[host] ||= [] ) << cookie
+      end
+
+      def delete_tctp_cookie(host, cookie)
+        @tctp_cookies[host].delete(cookie)
       end
 
       def register_halec(handshake_url, halec)
@@ -66,6 +70,13 @@ module Tresor
           @promised_halec
         end
 
+        # Returns the most probable session cookie, i.e., the cookie of the fist HALEC which would be
+        # available. This would err only, if there are a) multiple sessions for different cookies and there
+        # would b) be a concurrent response which would take the last HALEC for the probable session cookie.
+        def probable_tctp_session_cookie
+          @halec_registry.halec_for(@host, @handshake_url, true).tctp_session_cookie
+        end
+
         def return
           @halec_registry.halecs(@handshake_url)[@promised_halec.url] = @promised_halec if @promised_halec
 
@@ -75,7 +86,7 @@ module Tresor
         end
       end
 
-      def halec_for(host, resource_url)
+      def halec_for(host, resource_url, peek = false)
         handshake_url = Tresor::TCTP.handshake_url(host, resource_url)
 
         free_halecs = halecs(handshake_url)
@@ -83,7 +94,11 @@ module Tresor
         if free_halecs.count == 0
           raise HALECUnavailable.new
         else
-          free_halecs.shift[1]
+          if peek
+            free_halecs.values.first
+          else
+            free_halecs.shift[1]
+          end
         end
       end
 

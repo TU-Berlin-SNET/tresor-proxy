@@ -39,6 +39,11 @@ module Tresor::Proxy
     # @return [Boolean]
     attr_accessor :is_xacml_enabled
 
+    # The XACML PDP Rest URL
+    # !@attr [rw] xacml_pdp_rest_url
+    # @return [String]
+    attr_accessor :xacml_pdp_rest_url
+
     # Does this proxy output raw data on the console?
     # !@attr [rw] output_raw_data
     # @return [Boolean]

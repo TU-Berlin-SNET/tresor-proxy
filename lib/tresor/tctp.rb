@@ -5,6 +5,8 @@ module Tresor
     autoload :HALECRegistry
     autoload :DiscoveryInformation
 
+    ActiveSupport::Dependencies.load_file File.join(__dir__, 'tctp', 'halec_extension.rb')
+
     # Discovered TCTP information
     @@host_discovery_information = {}
 

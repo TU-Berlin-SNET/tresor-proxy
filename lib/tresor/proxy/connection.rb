@@ -19,7 +19,7 @@ module Tresor::Proxy
             Tresor::Frontend::ClaimSSO::RedirectToSSOFrontendHandler,
             Tresor::Frontend::ClaimSSO::ProcessSAMLResponseFrontendHandler,
             Tresor::Frontend::TresorProxyFrontendHandler,
-            Tresor::Frontend::XACML::RedirectIfNotAuthorizedHandler,
+            Tresor::Frontend::XACML::DenyIfNotAuthorizedHandler,
             Tresor::Frontend::HTTPEncryptingRelayFrontendHandler,
             Tresor::Frontend::HTTPRelayFrontendHandler
         ]
@@ -60,6 +60,11 @@ module Tresor::Proxy
     # @return [Tresor::Frontend::FrontendHandler] The handler
     attr_accessor :frontend_handler
 
+    # Additional headers, which are to be relayed to the client.
+    # @!attr [rw] additional_headers_to_relay
+    # @return [Hash] The additional headers
+    attr_accessor :additional_headers_to_relay
+
     # Initializes the connection by setting the proxy reference and resetting the HTTP parser
     # @param [Tresor::Proxy::Proxy] proxy The proxy reference
     def initialize(proxy)
@@ -72,6 +77,7 @@ module Tresor::Proxy
         @cookies, @query_vars, @parsed_request_uri = nil, nil, nil
 
         @client_headers = headers
+        @additional_headers_to_relay = {}
 
         log.debug (log_key) {"Headers complete. Request is #{@http_parser.http_method} #{@http_parser.request_url} HTTP/1.1"}
 
@@ -102,7 +108,7 @@ module Tresor::Proxy
         frontend_handler_class = Connection.frontend_handler_classes.find {|h| h.can_handle? self}
 
         EM.schedule do
-          if frontend_handler_class
+          if !frontend_handler_class.eql? NilClass
             log.debug (log_key) { "Set frontend handler to #{frontend_handler.class.name}" }
 
             @frontend_handler = frontend_handler_class.new(self)
@@ -219,6 +225,21 @@ module Tresor::Proxy
       end
 
       @query_vars
+    end
+
+    # Gets the authorized subject ID
+    # @return [String]
+    def subject_id
+      if sso_id
+        proxy.sso_sessions[sso_id].name_id
+      else
+        nil
+      end
+    end
+
+    # Gets the SSO id, either from cookie or from query string
+    def sso_id
+      cookies['tresor_sso_id'] || query_vars['tresor_sso_id']
     end
   end
 end

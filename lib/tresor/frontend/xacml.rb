@@ -3,7 +3,7 @@ module Tresor
     module XACML
       extend ActiveSupport::Autoload
 
-      autoload :RedirectIfNotAuthorizedHandler
+      autoload :DenyIfNotAuthorizedHandler
     end
   end
 end

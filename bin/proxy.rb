@@ -15,6 +15,7 @@ opts = Slop.parse do
   on 's=', 'threadpool', 'The Eventmachine thread pool size (default: 20)'
   on 't', 'trace', 'Enable tracing'
   on 'l=', 'loglevel', 'Specify log level (FATAL, ERROR, WARN, INFO, DEBUG - default INFO)'
+  on 'f=', 'logfile', 'Specify log file'
   on 'c', 'tctp_client', 'Enable TCTP client'
   on 'r', 'tctp_server', 'Enable TCTP server'
   on 'y=', 'reverse_yaml', 'Load reverse proxy settings from YAML file'

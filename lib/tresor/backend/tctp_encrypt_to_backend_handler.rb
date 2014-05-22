@@ -15,7 +15,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
 
     log.debug (log_key) { "Encrypting to backend: #{start_line[0..-2]}" }
 
-    tctp_cookie = backend.proxy.halec_registry.get_tctp_cookie(backend.client_connection.host)
+    @tctp_cookie = @halec_promise.probable_tctp_session_cookie
     tctp_cookie_sent = false
 
     backend_connection.send_data start_line
@@ -24,8 +24,8 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
     backend.client_connection.client_headers.each do |header, value|
       next if header.eql?('Accept-Encoding') || header.eql?('Content-Length')
 
-      if header.eql?('Cookie') && tctp_cookie
-        headers << {'Cookie' => "#{value};#{tctp_cookie}"}
+      if header.eql?('Cookie') && @tctp_cookie
+        headers << {'Cookie' => "#{value};#{@tctp_cookie}"}
         tctp_cookie_sent = true
 
         # Do not send double cookies
@@ -45,7 +45,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
       headers << {'Content-Encoding' => 'encrypted'}
     end
 
-    headers << {'Cookie' => tctp_cookie} unless tctp_cookie_sent
+    headers << {'Cookie' => @tctp_cookie} unless tctp_cookie_sent
     headers << {'Accept-Encoding' => 'encrypted'}
 
     send_client_headers headers
@@ -80,6 +80,8 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
 
     relay_backend_headers headers
 
+    relay_additional_headers
+
     relay "\r\n"
   end
 
@@ -97,12 +99,17 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
 
         @halec = @halec_promise.redeem_halec(URI(body_halec_url))
 
-        #TODO Handle HALEC missing exception
+        if @halec
+          chunk_without_url = chunk[(first_newline_index + 2)..-1]
 
-        chunk_without_url = chunk[(first_newline_index + 2)..-1]
+          unless chunk_without_url.eql?('')
+            decrypt_and_relay chunk_without_url
+          end
+        else
+          # TODO Better unknown HALEC handling
+          log.error (log_key) { "Unknown HALEC #{body_halec_url}" }
 
-        unless chunk_without_url.eql?('')
-          decrypt_and_relay chunk_without_url
+          tilt
         end
 
         @first_chunk = false
@@ -131,7 +138,14 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
   def decrypt_and_relay(data)
     @halec.decrypt_data_async(data) do |decrypted_data|
       EM.schedule do
-        relay_as_chunked decrypted_data
+        if decrypted_data.is_a? String
+          relay_as_chunked decrypted_data
+        else
+          # Exception when decrypting data
+          log.error (log_key) { "Exception when decrypting data: #{decrypted_data}" }
+
+          tilt
+        end
       end
     end
   end
@@ -141,7 +155,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
       EM.schedule do
         do_finish_response
       end
-    end
+    end if @halec
   end
 
   def do_finish_response
@@ -201,5 +215,12 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
 
   def log_key
     "#{@backend.proxy.name} - #{@backend.log_key} - TCTP Encrypt to Backend handler"
+  end
+
+  # Tilt: Delete cookie, close client connection & backend connection
+  def tilt
+    backend.proxy.halec_registry.delete_tctp_cookie(backend.client_connection.host, @tctp_cookie)
+    backend.client_connection.close_connection(true)
+    backend_connection.close_connection(true)
   end
 end

@@ -17,6 +17,14 @@ module Tresor
 
         @has_request_body = false
 
+        if connection.proxy.is_sso_enabled
+          sso_id = connection.query_vars['tresor_sso_id']
+
+          if sso_id
+            connection.additional_headers_to_relay['Set-Cookie'] = "tresor_sso_id=#{sso_id}"
+          end
+        end
+
         @backend = Tresor::Backend::Backend.new(connection)
       end
 

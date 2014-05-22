@@ -79,6 +79,13 @@ module Tresor
         end
       end
 
+      # Relays additional headers
+      def relay_additional_headers
+        @backend.client_connection.additional_headers_to_relay.each do |header, value|
+          relay "#{header}: #{value}\r\n"
+        end
+      end
+
       def on_backend_headers_complete(headers)
         relay "HTTP/1.1 #{backend_connection.http_parser.status_code}\r\n"
 
@@ -90,6 +97,8 @@ module Tresor
         end
 
         relay_backend_headers headers
+
+        relay_additional_headers
 
         relay "\r\n"
       end
