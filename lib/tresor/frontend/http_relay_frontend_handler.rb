@@ -21,7 +21,7 @@ module Tresor
           sso_id = connection.query_vars['tresor_sso_id']
 
           if sso_id
-            connection.additional_headers_to_relay['Set-Cookie'] = "tresor_sso_id=#{sso_id}"
+            connection.additional_headers_to_relay['Set-Cookie'] = "tresor_sso_id=#{sso_id}; domain=#{connection.host}; path=/"
           end
         end
 

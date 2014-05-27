@@ -32,7 +32,7 @@ module Tresor
             connection.send_data "HTTP/1.1 302 Found \r\n"
             connection.send_data "Host: #{connection.proxy.hostname}\r\n"
             connection.send_data "Content-Length: #{build_html_response(wdycf_url).length}\r\n"
-            connection.send_data "Location: #{build_wdycf_url(new_id)}\r\n\r\n"
+            connection.send_data "Location: #{wdycf_url}\r\n\r\n"
             connection.send_data build_html_response(wdycf_url)
           else
             connection.send_error_response Exception.new('SSO token missing')

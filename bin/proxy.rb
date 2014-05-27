@@ -22,8 +22,9 @@ opts = Slop.parse do
   on 'x', 'raw_output', 'Output RAW data on console'
   on 'sso', 'sso', 'Perform claims based authentication'
   on 'a', 'xacml', 'Perform XACML'
-  on 'fpurl', 'fpurl', 'The SSO federation provider URL'
-  on 'hrurl', 'hrurl', 'The SSO home realm URL'
+  on 'pdpurl=', 'pdpurl=', 'The PDP URL'
+  on 'fpurl=', 'fpurl=', 'The SSO federation provider URL'
+  on 'hrurl=', 'hrurl=', 'The SSO home realm URL'
 end
 
 EventMachine.threadpool_size = opts[:threadpool] || 20
@@ -35,6 +36,11 @@ proxy.log.level = Logger.const_get(opts[:loglevel] || 'INFO')
 proxy.is_tctp_client = opts[:tctp_client]
 proxy.is_tctp_server = opts[:tctp_server]
 proxy.is_sso_enabled = opts[:sso]
+proxy.is_xacml_enabled = opts[:xacml]
+
+proxy.xacml_pdp_rest_url = opts[:pdpurl]
+proxy.fpurl = opts[:fpurl]
+proxy.hrurl = opts[:hrurl]
 proxy.output_raw_data = opts[:raw_output]
 
 if opts[:reverse_yaml]

@@ -144,7 +144,6 @@ module Tresor::Proxy
     end
 
     def stop
-      log.info { "Terminating ProxyServer" }
       EventMachine.stop
 
       @stop_callback.succeed

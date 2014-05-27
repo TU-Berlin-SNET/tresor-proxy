@@ -12,7 +12,7 @@ module Tresor::Proxy
       # @return [Array[Class]] Available frontend handler classes
       def frontend_handler_classes
         # TODO Add handlers depending on Proxy configuration, e.g. TCTP or XACML
-        @available_frontend_handlers ||= [
+        [
             Tresor::Frontend::TCTPDiscoveryFrontendHandler,
             Tresor::Frontend::TCTPHalecCreationFrontendHandler,
             Tresor::Frontend::TCTPHandshakeFrontendHandler,
@@ -105,11 +105,15 @@ module Tresor::Proxy
       end
 
       EM.defer do
-        frontend_handler_class = Connection.frontend_handler_classes.find {|h| h.can_handle? self}
+        frontend_handler_class = Connection.frontend_handler_classes.find do |h|
+          log.debug (log_key) { "Testing frontend handler #{h.name}" }
+
+          h.can_handle? self
+        end
 
         EM.schedule do
           if !frontend_handler_class.eql? NilClass
-            log.debug (log_key) { "Set frontend handler to #{frontend_handler.class.name}" }
+            log.debug (log_key) { "Set frontend handler to #{frontend_handler_class.name}" }
 
             @frontend_handler = frontend_handler_class.new(self)
 
@@ -195,16 +199,16 @@ module Tresor::Proxy
     # @return [Hash] Cookies as Hash
     def cookies
       unless @cookies
-        @cookies = {}
-
         http_cookie_header = http_parser.headers['Cookie']
 
         if http_cookie_header
-          http_cookie_header.split(';').each do |cookie|
-            key_value = cookie.split('=')
-
-            @cookies[key_value[0]] = key_value[1]
+          begin
+            @cookies = Hash[http_cookie_header.split(';').map{|c| c.strip.split('=', 2)}]
+          rescue Exception
+            @cookies = {}
           end
+        else
+          @cookies = {}
         end
       end
 
@@ -218,7 +222,11 @@ module Tresor::Proxy
         http_query = parsed_request_uri.query
 
         if http_query
-          @query_vars = Hash[[http_query.split('=')]]
+          begin
+            @query_vars = Hash[http_query.split('&').map{|q| q.split('=')}]
+          rescue Exception
+            @query_vars = {}
+          end
         else
           @query_vars = {}
         end
@@ -230,16 +238,24 @@ module Tresor::Proxy
     # Gets the authorized subject ID
     # @return [String]
     def subject_id
-      if sso_id
-        proxy.sso_sessions[sso_id].name_id
-      else
-        nil
-      end
+      sso_session ? sso_session.name_id : nil
+    end
+
+    def subject_attributes
+      sso_session ? sso_session.attributes_hash : {}
     end
 
     # Gets the SSO id, either from cookie or from query string
     def sso_id
-      cookies['tresor_sso_id'] || query_vars['tresor_sso_id']
+      query_vars['tresor_sso_id'] || cookies['tresor_sso_id']
+    end
+
+    def sso_session
+      if sso_id
+        proxy.sso_sessions[sso_id]
+      else
+        nil
+      end
     end
   end
 end

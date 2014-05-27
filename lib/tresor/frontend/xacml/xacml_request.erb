@@ -2,8 +2,15 @@
 <Request xmlns="urn:oasis:names:tc:xacml:3.0:core:schema:wd-17" xmlns:gml="http://www.opengis.net/gml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:oasis:names:tc:xacml:3.0:core:schema:wd-17 http://docs.oasis-open.org/xacml/3.0/xacml-core-v3-schema-wd-17.xsd" ReturnPolicyIdList="false" CombinedDecision="false">
   <Attributes Category="urn:oasis:names:tc:xacml:1.0:subject-category:access-subject">
     <Attribute AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id" IncludeInResult="false">
-      <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string"><%= subject_id %></AttributeValue>
+      <AttributeValue DataType="urn:oasis:names:tc:xacml:1.0:data-type:rfc822Name"><%= subject_id %></AttributeValue>
     </Attribute>
+    <% attributes.each do |name, values| %>
+    <Attribute AttributeId="<%= name %>" IncludeInResult="false">
+      <% values.each do |value| %>
+        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string"><%= value %></AttributeValue>
+      <% end %>
+    </Attribute>
+    <% end %>
   </Attributes>
   <Attributes Category="urn:oasis:names:tc:xacml:3.0:attribute-category:resource">
     <Attribute AttributeId="urn:oasis:names:tc:xacml:1.0:resource:resource-id" IncludeInResult="false">
