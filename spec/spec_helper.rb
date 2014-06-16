@@ -20,3 +20,9 @@ RSpec.configure do |config|
   Tresor::Proxy::TresorProxy.instance_variable_set :@logger, Logger.new('| tee spec/spec.log')
   Tresor::Proxy::TresorProxy.logger.level = ::Logger::DEBUG
 end
+
+class Net::HTTP::Connect < Net::HTTPRequest
+  METHOD = 'CONNECT'
+  REQUEST_HAS_BODY = true
+  RESPONSE_HAS_BODY = true
+end

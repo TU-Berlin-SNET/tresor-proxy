@@ -13,6 +13,7 @@ module Tresor::Proxy
       def frontend_handler_classes
         # TODO Add handlers depending on Proxy configuration, e.g. TCTP or XACML
         [
+            Tresor::Frontend::NotSupportedRequestHandler,
             Tresor::Frontend::TCTPDiscoveryFrontendHandler,
             Tresor::Frontend::TCTPHalecCreationFrontendHandler,
             Tresor::Frontend::TCTPHandshakeFrontendHandler,

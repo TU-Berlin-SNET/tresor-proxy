@@ -58,6 +58,18 @@ describe 'A basic forward proxy' do
     expect(response.code).to eq '502'
   end
 
+  it 'does not allow CONNECT' do
+    http = Net::HTTP.new(proxy_uri.host, proxy_uri.port)
+    request = Net::HTTP::Connect.new('127.0.0.1:43209')
+
+    request.body = test_body
+
+    response = http.request request
+
+    expect(response.code).to eq '405'
+    expect(response.body.length).to eq 0
+  end
+
   it 'can be accessed in parallel' do
     threadgroup = ThreadGroup.new
 
