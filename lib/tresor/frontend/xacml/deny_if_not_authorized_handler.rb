@@ -55,6 +55,8 @@ module Tresor
 
             http_request = Net::HTTP::Post.new (pdp_uri.path == '' ? '/' : pdp_uri.path)
             http_request['Host'] = "#{pdp_uri.host}:#{pdp_uri.port}"
+            http_request['Accept'] = 'application/xacml+xml'
+            http_request['Content-Type'] = 'application/xacml+xml'
             http_request.body = xacml_request
 
             http_response = http.request(http_request)
@@ -75,7 +77,7 @@ module Tresor
               connection.additional_headers_to_relay['TRESOR-XACML-Error'] = e.to_s
             end
           else
-            connection.additional_headers_to_relay['TRESOR-XACML-HTTP-Error'] = http_response.body
+            connection.additional_headers_to_relay['TRESOR-XACML-HTTP-Error'] = http_response.body.gsub(/\r/,"").gsub(/\n/,"")
           end
         end
 
