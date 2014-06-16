@@ -140,6 +140,8 @@ module Tresor::Proxy
       rescue Exception => e
         log.fatal { "Error in TRESOR Proxy: #{e}" }
         log.fatal { e.backtrace }
+
+        retry
       end
     end
 
