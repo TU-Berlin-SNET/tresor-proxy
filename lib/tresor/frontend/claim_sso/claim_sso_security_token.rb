@@ -23,7 +23,7 @@ module Tresor
         end
 
         def attributes_hash
-          attributes.map {|a| [a['Name'], a.children.map(&:text)]}
+          Hash[attributes.map {|a| [a['Name'], a.children.map(&:text)]}]
         end
       end
     end

@@ -24,15 +24,19 @@ module Tresor
 
         backend_connection.send_data start_line
 
-        send_client_headers(backend.client_connection.client_headers)
+        client_headers = [backend.client_connection.client_headers]
 
-        #if(@backend.client_connection.query_vars['tresor_sso_id'])
-        #  sso_id = @backend.client_connection.query_vars['tresor_sso_id']
-        #
-        #  sso_token = Tresor::Frontend::ClaimSSO::RedirectToSSOFrontendHandler.sso_sessions[sso_id]
-        #
-        #  backend.send_data "TRESOR-Identity: #{sso_token.name_id}\r\n"
-        #end
+        if(sso_session = @backend.client_connection.sso_session)
+          client_headers << {"TRESOR-Identity" => sso_session.name_id}
+
+          sso_session.attributes_hash.each do |attribute, values|
+            values.each do |value|
+              client_headers << {"TRESOR-Attribute" => "#{attribute} #{value}"}
+            end
+          end
+        end
+
+        send_client_headers(client_headers)
 
         backend_connection.send_data "\r\n"
       end
