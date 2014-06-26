@@ -6,3 +6,4 @@ Gemfile.lock
 .idea
 profile-results
 trace.bin
+proxy.log

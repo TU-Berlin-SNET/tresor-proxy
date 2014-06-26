@@ -3,3 +3,4 @@
 'app.local': 'http://127.0.0.1:3000'
 'openshift.local': 'http://ruby-tctp.rhcloud.com'
 'www.tresordemo.local': 'http://www.cloud-tresor.de'
+'tu-berlin.local': 'http://www.tu-berlin.de'
