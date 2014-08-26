@@ -11,7 +11,7 @@ opts = Slop.parse(ARGV, :help => true) do
 
   on 'i=', 'ip', 'The ip address to bind to (default: all)'
   on 'p=', 'port', 'The port number (default: 80)'
-  on 'h=', 'hostname', 'The HTTP hostname of the proxy'
+  on 'n=', 'hostname', 'The HTTP hostname of the proxy'
   on 'P=', 'threadpool', 'The Eventmachine thread pool size (default: 20)'
   on 't', 'trace', 'Enable tracing'
   on 'l=', 'loglevel', 'Specify log level (FATAL, ERROR, WARN, INFO, DEBUG - default INFO)'
