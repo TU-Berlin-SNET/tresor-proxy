@@ -62,11 +62,9 @@ module Tresor
 
       # Decrypts +chunk+ and sends it to the client
       def send_decrypted_data(chunk)
-        server_halec.decrypt_data(chunk) do |decrypted|
-          EM.schedule do
-            send_as_chunked decrypted
-          end
-        end
+        server_halec.queue.push proc {
+          send_as_chunked server_halec.decrypt_data(chunk)
+        }
       end
 
       def send_as_chunked(decrypted_data)
@@ -81,15 +79,15 @@ module Tresor
 
       # Encrypts +chunk+ and sends it to the client
       def relay_and_encrypt(chunk)
-        server_halec.encrypt_data_async(chunk) do |encrypted_data|
-          EM.schedule do
-            chunk_length_as_hex = encrypted_data.length.to_s(16)
+        server_halec.queue.push proc {
+          encrypted_data = server_halec.encrypt_data(chunk)
 
-            log.debug (log_key) { "Sending #{encrypted_data.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
+          chunk_length_as_hex = encrypted_data.length.to_s(16)
 
-            connection.send_data "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
-          end
-        end
+          log.debug (log_key) { "Sending #{encrypted_data.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
+
+          connection.send_data "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
+        }
       end
 
       def relay_from_backend(data)
@@ -134,13 +132,11 @@ module Tresor
 
           # If the backend response is complete, return the HALEC
           @client_http_parser.on_message_complete = proc do
-            server_halec.call_async do
-              EM.schedule do
-                connection.send_data "0\r\n\r\n"
+            server_halec.queue.push proc {
+              connection.send_data "0\r\n\r\n"
 
-                connection.proxy.halec_registry.register_halec(:server, @server_halec)
-              end
-            end
+              connection.proxy.halec_registry.register_halec(:server, @server_halec)
+            }
           end
         end
 

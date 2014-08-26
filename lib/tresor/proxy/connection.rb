@@ -130,6 +130,10 @@ module Tresor::Proxy
       @client_port, @client_ip = Socket.unpack_sockaddr_in(get_peername)
 
       log.debug (log_key) {"Connection initialized"}
+
+      if @proxy.tls
+        start_tls :private_key_file => proxy.tls_key, :cert_chain_file => proxy.tls_crt, :verify_peer => false
+      end
     end
 
     def receive_data(data)

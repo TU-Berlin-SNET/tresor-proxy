@@ -92,18 +92,15 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
       # On first chunk: Get the HALEC URL, redeem the promise (get the corresponding HALEC) and set up the HALEC to write
       # unencrypted data as chunks back to the client.
       if @first_chunk
-        first_newline_index = chunk.index("\r\n")
-        body_halec_url = chunk[0, first_newline_index]
+        body_halec_url, encrypted_data = chunk.split("\r\n", 2)
 
         log.debug (log_key) { "Body was encrypted using HALEC #{body_halec_url}" }
 
         @halec = @halec_promise.redeem_halec(URI(body_halec_url))
 
         if @halec
-          chunk_without_url = chunk[(first_newline_index + 2)..-1]
-
-          unless chunk_without_url.eql?('')
-            decrypt_and_relay chunk_without_url
+          unless encrypted_data.blank?
+            decrypt_and_relay encrypted_data
           end
         else
           # TODO Better unknown HALEC handling
@@ -135,27 +132,39 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
     @halec_promise.return
   end
 
-  def decrypt_and_relay(data)
-    @halec.decrypt_data_async(data) do |decrypted_data|
-      EM.schedule do
-        if decrypted_data.is_a? String
-          relay_as_chunked decrypted_data
-        else
-          # Exception when decrypting data
-          log.error (log_key) { "Exception when decrypting data: #{decrypted_data}" }
+  def decrypt_and_relay(encrypted_data)
+    @halec.queue.push proc {
+      decrypted_data = @halec.decrypt_data encrypted_data
 
-          tilt
-        end
+      if decrypted_data.is_a? String
+        relay_as_chunked decrypted_data
+      else
+        # Exception when decrypting data
+        log.error (log_key) { "Exception when decrypting data: #{decrypted_data}" }
+
+        tilt
       end
-    end
+    }
+  end
+
+  def encrypt_upstream(plaintext)
+    @halec.queue.push proc {
+      encrypted_data = @halec.encrypt_data(plaintext)
+
+      chunk_length_as_hex = encrypted_data.length.to_s(16)
+
+      log.debug (log_key) { "Sending #{encrypted_data.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
+
+      chunk = "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
+
+      backend_connection.send_data chunk
+    }
   end
 
   def finish_response
-    @halec.call_async do
-      EM.schedule do
-        do_finish_response
-      end
-    end if @halec
+    @halec.queue.push proc {
+      do_finish_response
+    } if @halec
   end
 
   def do_finish_response
@@ -182,29 +191,17 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
       backend_connection.send_data chunk
     end
 
-    @halec.encrypt_data_async(data) do |encrypted_data|
-      EM.schedule do
-        chunk_length_as_hex = encrypted_data.length.to_s(16)
-
-        log.debug (log_key) { "Sending #{encrypted_data.length} (#{chunk_length_as_hex}) bytes of encrypted data from backend to client" }
-
-        chunk = "#{chunk_length_as_hex}\r\n#{encrypted_data}\r\n"
-
-        backend_connection.send_data chunk
-      end
-    end
+    encrypt_upstream(data)
   end
 
   def on_client_message_complete
     if @request_has_body
-      @halec.call_async do
-        EM.schedule do
-          backend_connection.send_data "0\r\n\r\n"
-        end
-      end
-    end
+      @halec.queue.push proc {
+        backend_connection.send_data "0\r\n\r\n"
 
-    @halec_promise.return
+        @halec_promise.return
+      }
+    end
   end
 
   def receive_data(data)

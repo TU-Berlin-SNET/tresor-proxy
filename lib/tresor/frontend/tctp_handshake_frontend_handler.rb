@@ -26,13 +26,17 @@ module Tresor
       end
 
       def on_message_complete
-        EM.defer do
-          @server_halec.engine.inject @handshake_data.join
+        @server_halec.engine.inject @handshake_data.join
 
-          @server_halec.engine.read
+        @server_halec.engine.read
 
-          handshake_response = @server_halec.engine.extract
-          connection.send_data "HTTP/1.1 200 OK\r\nContent-Length: #{handshake_response.length}\r\n\r\n#{handshake_response}"
+        handshake_response = @server_halec.engine.extract
+        connection.send_data "HTTP/1.1 200 OK\r\nContent-Length: #{handshake_response.length}\r\n\r\n#{handshake_response}"
+
+        if @server_halec.engine.state.eql? 'SSLOK '
+          log.debug (log_key) { "TCTP Handshake complete. Server HALEC #{@server_halec.url} ready. Popping queue."}
+
+          @server_halec.start_queue_popping
         end
       end
     end

@@ -6,30 +6,33 @@ require 'slop'
 require 'logger'
 require 'yaml'
 
-opts = Slop.parse do
+opts = Slop.parse(ARGV, :help => true) do
   banner 'Usage: proxy.rb [options]'
 
   on 'i=', 'ip', 'The ip address to bind to (default: all)'
   on 'p=', 'port', 'The port number (default: 80)'
   on 'h=', 'hostname', 'The HTTP hostname of the proxy'
-  on 's=', 'threadpool', 'The Eventmachine thread pool size (default: 20)'
+  on 'P=', 'threadpool', 'The Eventmachine thread pool size (default: 20)'
   on 't', 'trace', 'Enable tracing'
   on 'l=', 'loglevel', 'Specify log level (FATAL, ERROR, WARN, INFO, DEBUG - default INFO)'
-  on 'f=', 'logfile', 'Specify log file'
-  on 'c', 'tctp_client', 'Enable TCTP client'
-  on 'r', 'tctp_server', 'Enable TCTP server'
-  on 'y=', 'reverse_yaml', 'Load reverse proxy settings from YAML file'
-  on 'x', 'raw_output', 'Output RAW data on console'
-  on 'sso', 'sso', 'Perform claims based authentication'
-  on 'a', 'xacml', 'Perform XACML'
-  on 'pdpurl=', 'pdpurl=', 'The PDP URL'
-  on 'fpurl=', 'fpurl=', 'The SSO federation provider URL'
-  on 'hrurl=', 'hrurl=', 'The SSO home realm URL'
+  on 'logfile=', 'Specify log file'
+  on 'C', 'tctp_client', 'Enable TCTP client'
+  on 'S', 'tctp_server', 'Enable TCTP server'
+  on 'tls', 'Enable TLS'
+  on 'tls_key=', 'Path to TLS key'
+  on 'tls_crt=', 'Path to TLS server certificate'
+  on 'reverse=', 'Load reverse proxy settings from YAML file'
+  on 'raw_output', 'Output RAW data on console'
+  on 'sso', 'Perform claims based authentication'
+  on 'xacml', 'Perform XACML'
+  on 'pdpurl=', 'The PDP URL'
+  on 'fpurl=', 'The SSO federation provider URL'
+  on 'hrurl=', 'The SSO home realm URL'
 end
 
 EventMachine.threadpool_size = opts[:threadpool] || 20
 
-proxy = Tresor::Proxy::TresorProxy.new(opts[:ip] || '0.0.0.0', opts[:hostname] || 'proxy.local', opts[:port] || '80')
+proxy = Tresor::Proxy::TresorProxy.new(opts[:ip] || '0.0.0.0', opts[:hostname] || 'proxy.local', opts[:port] || '80', 'TRESOR Proxy', opts[:tls] || false, opts[:tls_key], opts[:tls_crt])
 
 proxy.log.level = Logger.const_get(opts[:loglevel] || 'INFO')
 
@@ -43,8 +46,8 @@ proxy.fpurl = opts[:fpurl]
 proxy.hrurl = opts[:hrurl]
 proxy.output_raw_data = opts[:raw_output]
 
-if opts[:reverse_yaml]
-  mappings = YAML::load_file(File.join(Dir.pwd, opts[:reverse_yaml]))
+if opts[:reverse]
+  mappings = YAML::load_file(File.join(Dir.pwd, opts[:reverse]))
 
   proxy.reverse_mappings = mappings
 end

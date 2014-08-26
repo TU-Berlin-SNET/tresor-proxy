@@ -1,14 +1,21 @@
 class Rack::TCTP::HALEC
-  # Proc, which is called with plaintext data available after injection
-  # @!attr [rw] plaintext_proc
-  # @return [Proc] plaintext_proc The Proc
-  attr_accessor :plaintext_proc
-
-  # Proc, which is called with encrypted data available after writing
-  # @!attr [rw] encrypted_proc
-  # @return [Proc] encrypted_proc The Proc
-  attr_accessor :encrypted_proc
+  # Reactor scheduled queue for HALEC operations
+  # @!attr [rw] queue
+  # @return [EventMachine::Queue] queue The Queue
+  attr_accessor :queue
 
   # TCTP session cookie associated with this HALEC
   attr_accessor :tctp_session_cookie
+
+  def start_queue_popping
+    queue_pop_proc = proc { |proc|
+      log.debug ("HALEC #{url}") {"Calling proc #{proc.to_s}"}
+
+      proc.call
+
+      queue.pop queue_pop_proc
+    }
+
+    queue.pop queue_pop_proc
+  end
 end

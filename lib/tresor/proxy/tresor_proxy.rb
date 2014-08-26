@@ -19,6 +19,14 @@ module Tresor::Proxy
     # @!attr [r] port
     attr :port
 
+    # Is TLS enabled
+    # @return [Boolean]
+    # @!attr [r] tls
+    attr :tls
+
+    attr :tls_key
+    attr :tls_crt
+
     # Does this proxy encrypt messages upstream?
     # !@attr [rw] is_tctp_client
     # @return [Boolean]
@@ -91,15 +99,18 @@ module Tresor::Proxy
     #
     # Contains a block, which sets +started+ to +false+.
     #
-    # @!attribute [r] start_callback
+    # @!attribute [r] stop_callback
     # @return [EventMachine::DefaultDeferrable]
     attr :stop_callback
 
-    def initialize(ip, hostname, port, name = "TRESOR Proxy")
+    def initialize(ip, hostname, port, name = "TRESOR Proxy", tls = false, tls_key = nil, tls_crt = nil)
       @ip = ip
       @hostname = hostname
       @port = port
       @name = name
+      @tls = tls
+      @tls_key = tls_key
+      @tls_crt = tls_crt
       @connection_pool = ConnectionPool.new(self)
       @halec_registry = Tresor::TCTP::HALECRegistry.new
       @reverse_mappings = {}

@@ -4,6 +4,7 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
     super(backend)
 
     @halec = Rack::TCTP::ClientHALEC.new
+    @halec.queue = EventMachine::Queue.new
     @halec.engine.read
     client_hello = @halec.engine.extract
 
@@ -40,6 +41,10 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
 
       @halec.tctp_session_cookie = @tctp_cookie
     end
+
+    if @halec.url
+      backend.proxy.halec_registry.register_halec @handshake_url, @halec
+    end
   end
 
   def on_backend_body(chunk)
@@ -50,9 +55,9 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
       @halec.engine.read
 
       if(@halec.engine.state.eql? 'SSLOK ')
-        log.debug (log_key) { "TCTP Handshake complete. HALEC #{@halec.url} ready for encrypting data"}
+        log.debug (log_key) { "TCTP Handshake complete. HALEC #{@halec.url} ready for encrypting data. Popping queue."}
 
-        backend.proxy.halec_registry.register_halec @handshake_url, @halec
+        @halec.start_queue_popping
       end
     rescue Exception => e
       # Invalid handshake data received. Set @last_response to true in order to redecide handler

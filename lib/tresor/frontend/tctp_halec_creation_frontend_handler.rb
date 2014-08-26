@@ -13,6 +13,7 @@ module Tresor
         super(connection)
 
         @server_halec = Rack::TCTP::ServerHALEC.new
+        @server_halec.queue = EventMachine::Queue.new
         @handshake_data = []
       end
 
@@ -21,22 +22,20 @@ module Tresor
       end
 
       def on_message_complete
-        EM.defer do
-          @server_halec.engine.inject @handshake_data.join
+        @server_halec.engine.inject @handshake_data.join
 
-          halec_url = URI("http://#{connection.proxy.hostname}:#{connection.proxy.port}/halecs/#{Rack::TCTP::ServerHALEC.new_slug}")
+        halec_url = URI("http://#{connection.proxy.hostname}:#{connection.proxy.port}/halecs/#{Rack::TCTP::ServerHALEC.new_slug}")
 
-          @server_halec.engine.read
-          handshake_response = @server_halec.engine.extract
+        @server_halec.engine.read
+        handshake_response = @server_halec.engine.extract
 
-          @server_halec.url = halec_url
+        @server_halec.url = halec_url
 
-          connection.proxy.halec_registry.register_halec(:server, @server_halec)
+        connection.proxy.halec_registry.register_halec(:server, @server_halec)
 
-          log.debug(log_key) {"Registered server HALEC #{@server_halec.url}"}
+        log.debug(log_key) {"Registered server HALEC #{@server_halec.url}"}
 
-          connection.send_data "HTTP/1.1 200 OK\r\nLocation: #{halec_url.to_s}\r\nContent-Length: #{handshake_response.length}\r\n\r\n#{handshake_response}"
-        end
+        connection.send_data "HTTP/1.1 200 OK\r\nLocation: #{halec_url.to_s}\r\nContent-Length: #{handshake_response.length}\r\n\r\n#{handshake_response}"
       end
     end
   end

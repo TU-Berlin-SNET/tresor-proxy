@@ -79,6 +79,7 @@ describe 'A tctp server proxy' do
 
     # Feed the handshake response (change_cipher_spec, finished) to the client HALEC
     client_halec.engine.inject response.body
+    client_halec.engine.read
 
     # The handshake is now complete!
 
