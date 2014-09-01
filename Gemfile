@@ -4,7 +4,7 @@ gem 'activesupport'
 gem 'eventmachine', '~> 1.0.3'
 gem 'http_parser.rb', '0.6.0.beta.2'
 gem 'slop'
-gem 'rack-tctp', :path => File.join('..', 'tctp-rack')
+gem 'rack-tctp'
 
 group :test do
   gem 'rspec-prof'
