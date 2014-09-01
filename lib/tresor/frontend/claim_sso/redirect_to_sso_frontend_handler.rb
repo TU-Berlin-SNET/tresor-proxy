@@ -40,7 +40,7 @@ module Tresor
         def build_wtrealm_url
           wdycf_url = "http://#{connection.http_parser.headers['Host']}#{URI(connection.http_parser.request_url).path}"
 
-          return URI.encode_www_form_component("http://#{connection.proxy.hostname}/?wdycf_url=#{wdycf_url}")
+          return URI.encode_www_form_component("http://#{connection.proxy.hostname}:#{connection.proxy.port}/?wdycf_url=#{wdycf_url}")
         end
 
         def build_whr_url
