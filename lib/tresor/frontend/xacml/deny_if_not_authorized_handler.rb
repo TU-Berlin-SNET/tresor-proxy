@@ -66,7 +66,8 @@ module Tresor
 
         def get_service_uuid(connection)
           begin
-            service_name = connection.parsed_request_uri.hostname.partition('.').first
+            service_name = connection.parsed_request_uri.respond_to?(:request_uri) ?
+                connection.parsed_request_uri.hostname.partition('.').first : connection.host.partition('.').first
 
             http = get_http_to_broker(connection)
 
