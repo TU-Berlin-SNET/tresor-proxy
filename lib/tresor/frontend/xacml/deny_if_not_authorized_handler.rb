@@ -77,6 +77,11 @@ module Tresor
               http_request = Net::HTTP::Get.new("/service_uuid/#{service_name}")
               http_request['Host'] = "#{broker_url.host}:#{broker_url.port}"
 
+              if(broker_url.userinfo)
+                user, pw = broker_url.userinfo.split(':')
+                http_request.basic_auth(user, pw)
+              end
+
               http_response = http.request(http_request)
 
               if(http_response.code == '200')
