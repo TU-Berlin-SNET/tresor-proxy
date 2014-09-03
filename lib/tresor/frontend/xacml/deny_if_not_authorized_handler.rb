@@ -69,6 +69,8 @@ module Tresor
             service_name = connection.parsed_request_uri.respond_to?(:request_uri) ?
                 connection.parsed_request_uri.hostname.partition('.').first : connection.host.partition('.').first
 
+            connection.additional_headers_to_relay['TRESOR-Broker-Requested-Name'] = service_name
+
             http = get_http_to_broker(connection)
 
             http_to_broker_mutex(connection).synchronize do
@@ -84,11 +86,11 @@ module Tresor
 
               http_response = http.request(http_request)
 
+              connection.additional_headers_to_relay['TRESOR-Broker-Response'] = http_response.body.gsub("\n", '')
+
               if(http_response.code == '200')
                 return http_response.body
               else
-                connection.additional_headers_to_relay['TRESOR-Broker-Response'] = http_response.body.gsub("\n", '')
-
                 return 'unknown'
               end
             end
