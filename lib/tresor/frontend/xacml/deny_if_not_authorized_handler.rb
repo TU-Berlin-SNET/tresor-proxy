@@ -87,10 +87,14 @@ module Tresor
               if(http_response.code == '200')
                 return http_response.body
               else
+                connection.additional_headers_to_relay['TRESOR-Broker-Response'] = http_response.body.gsub("\n", '')
+
                 return 'unknown'
               end
             end
           rescue Exception => e
+            connection.additional_headers_to_relay['TRESOR-Broker-Exception'] = "#{e.to_s}|#{e.backtrace.join(',')}"
+
             return 'unknown'
           end
         end
