@@ -17,6 +17,7 @@ module Tresor
             pdp_uri = URI(connection.proxy.xacml_pdp_rest_url)
 
             http = Net::HTTP.new(pdp_uri.host, pdp_uri.port)
+            http.proxy_address = nil
 
             connection.proxy.instance_variable_set(:@pdp_http, http)
           end
@@ -36,61 +37,128 @@ module Tresor
           mutex
         end
 
-        def authorized?(connection)
-          subject_id = connection.subject_id
-          attributes = connection.subject_attributes
-          uri = connection.parsed_request_uri.to_s
-          http_method = connection.http_parser.http_method.downcase
+        def get_http_to_broker(connection)
+          http = connection.proxy.instance_variable_get(:@broker_http)
 
-          xacml_request = xacml_request_template.result(binding)
+          unless http
+            broker_uri = URI(connection.proxy.tresor_broker_url)
 
-          connection.additional_headers_to_relay['TRESOR-XACML-Request'] = xacml_request.gsub("\n", '')
+            http = Net::HTTP.new(broker_uri.host, broker_uri.port)
+            http.proxy_address = nil
 
-          http = get_http_to_pdp(connection)
-
-          http_response = ''
-
-          http_to_pdp_mutex(connection).synchronize do
-            pdp_uri = URI(connection.proxy.xacml_pdp_rest_url)
-
-            http_request = Net::HTTP::Post.new (pdp_uri.path == '' ? '/' : pdp_uri.path)
-            http_request['Host'] = "#{pdp_uri.host}:#{pdp_uri.port}"
-            http_request['Accept'] = 'application/xacml+xml'
-            http_request['Content-Type'] = 'application/xacml+xml'
-            http_request.body = xacml_request
-
-            http_response = http.request(http_request)
+            connection.proxy.instance_variable_set(:@broker_http, http)
           end
 
-          if(http_response.code == '200')
-            begin
-              connection.additional_headers_to_relay['TRESOR-XACML-Response'] = http_response.body
+          http
+        end
 
-              parsed_response = Nokogiri::XML(http_response.body)
+        def http_to_broker_mutex(connection)
+          mutex = connection.proxy.instance_variable_get(:@broker_http_mutex)
 
-              @decision = parsed_response.xpath('/x:Response/x:Result/x:Decision/text()', 'x' => 'urn:oasis:names:tc:xacml:3.0:core:schema:wd-17').to_s
+          unless mutex
+            mutex = Mutex.new
 
-              connection.additional_headers_to_relay['TRESOR-XACML-Decision'] = @decision
+            connection.proxy.instance_variable_set(:@broker_http_mutex, mutex)
+          end
 
-              @decision.eql? 'Permit'
-            rescue Exception => e
-              connection.additional_headers_to_relay['TRESOR-XACML-Error'] = e.to_s
+          mutex
+        end
+
+        def get_service_uuid(connection)
+          begin
+            service_name = connection.parsed_request_uri.hostname.partition('.').first
+
+            http = get_http_to_broker(connection)
+
+            http_to_broker_mutex(connection).synchronize do
+              broker_url = URI(connection.proxy.tresor_broker_url)
+
+              http_request = Net::HTTP::Get.new("/service_uuid/#{service_name}")
+              http_request['Host'] = "#{broker_url.host}:#{broker_url.port}"
+
+              http_response = http.request(http_request)
+
+              if(http_response.code == '200')
+                return http_response.body
+              else
+                return 'unknown'
+              end
             end
-          else
-            connection.additional_headers_to_relay['TRESOR-XACML-HTTP-Error'] = http_response.body.gsub(/\r/,"").gsub(/\n/,"")
+          rescue Exception => e
+            return 'unknown'
+          end
+        end
+
+        def authorized?(connection)
+          begin
+            subject_id = connection.subject_id
+            attributes = connection.subject_attributes
+            service_uuid = get_service_uuid(connection)
+            uri = connection.parsed_request_uri.request_uri
+            http_method = connection.http_parser.http_method.downcase
+
+            xacml_request = xacml_request_template.result(binding)
+
+            connection.additional_headers_to_relay['TRESOR-XACML-Request'] = xacml_request.gsub("\n", '')
+
+            http = get_http_to_pdp(connection)
+
+            http_response = ''
+
+            http_to_pdp_mutex(connection).synchronize do
+              pdp_uri = URI(connection.proxy.xacml_pdp_rest_url)
+
+              http_request = Net::HTTP::Post.new (pdp_uri.path == '' ? '/' : pdp_uri.path)
+              http_request['Host'] = "#{pdp_uri.host}:#{pdp_uri.port}"
+              http_request['Accept'] = 'application/xacml+xml'
+              http_request['Content-Type'] = 'application/xacml+xml'
+              http_request.body = xacml_request
+
+              http_response = http.request(http_request)
+            end
+
+            if(http_response.code == '200')
+              begin
+                connection.additional_headers_to_relay['TRESOR-XACML-Response'] = http_response.body
+
+                parsed_response = Nokogiri::XML(http_response.body)
+
+                @decision = parsed_response.xpath('/x:Response/x:Result/x:Decision/text()', 'x' => 'urn:oasis:names:tc:xacml:3.0:core:schema:wd-17').to_s
+
+                connection.additional_headers_to_relay['TRESOR-XACML-Decision'] = @decision
+
+                return @decision.eql? 'Permit'
+              rescue Exception => e
+                connection.additional_headers_to_relay['TRESOR-XACML-Error'] = e.to_s
+
+                @error = :xacml_error
+
+                return false
+              end
+            else
+              connection.additional_headers_to_relay['TRESOR-XACML-HTTP-Error'] = http_response.body.gsub(/\r/,"").gsub(/\n/,"")
+
+              @error = :http_error
+
+              return false
+            end
+          rescue Exception => e
+            connection.additional_headers_to_relay['TRESOR-XACML-Exception'] = "#{e.to_s}|#{e.backtrace.join(',')}"
           end
         end
 
         # @param [Tresor::Proxy::Connection] connection
         def can_handle?(connection)
           connection.proxy.is_xacml_enabled &&
-          !connection.http_parser.headers['Host'].start_with?(connection.proxy.hostname) &&
+          !connection.request_is_for_proxy &&
           !authorized?(connection)
         end
       end
 
       # @param [Tresor::Proxy::Connection] connection
       def initialize(connection)
+        @error = false
+
         super(connection)
       end
 
@@ -106,12 +174,22 @@ module Tresor
           connection.send_data "#{header}: #{value}\r\n"
         end
 
-        connection.send_data "Content-Length: #{build_forbidden_message.length}\r\n\r\n"
-        connection.send_data build_forbidden_message
+        message = build_message
+
+        connection.send_data "Content-Length: #{message.length}\r\n\r\n"
+        connection.send_data message
       end
 
-      def build_forbidden_message
-        'Forbidden'
+      def build_message
+        if(connection.additional_headers_to_relay['TRESOR-XACML-Error'])
+          "Error while processing XACML message\r\n#{connection.additional_headers_to_relay['TRESOR-XACML-Error']}"
+        elsif(connection.additional_headers_to_relay['TRESOR-XACML-HTTP-Error'])
+          "Error while communicating with PDP\r\n#{connection.additional_headers_to_relay['TRESOR-XACML-HTTP-Error']}"
+        elsif(connection.additional_headers_to_relay['TRESOR-XACML-Exception'])
+          "General error in XACML module:\r\n#{connection.additional_headers_to_relay['TRESOR-XACML-Exception']}"
+        else
+          'forbidden'
+        end
       end
     end
   end

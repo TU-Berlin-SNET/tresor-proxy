@@ -85,6 +85,8 @@ module Tresor::Proxy
     attr_accessor :name
     attr_accessor :started
 
+    attr_accessor :tresor_broker_url
+
     ##
     # Callback for when the proxy is started.
     #

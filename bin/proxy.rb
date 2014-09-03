@@ -9,6 +9,7 @@ require 'yaml'
 opts = Slop.parse(ARGV, :help => true) do
   banner 'Usage: proxy.rb [options]'
 
+  on 'b=', 'broker', 'The URL of the TRESOR broker'
   on 'i=', 'ip', 'The ip address to bind to (default: all)'
   on 'p=', 'port', 'The port number (default: 80)'
   on 'n=', 'hostname', 'The HTTP hostname of the proxy'
@@ -45,6 +46,7 @@ proxy.xacml_pdp_rest_url = opts[:pdpurl]
 proxy.fpurl = opts[:fpurl]
 proxy.hrurl = opts[:hrurl]
 proxy.output_raw_data = opts[:raw_output]
+proxy.tresor_broker_url = opts[:broker]
 
 if opts[:reverse]
   mappings = YAML::load_file(File.join(Dir.pwd, opts[:reverse]))
