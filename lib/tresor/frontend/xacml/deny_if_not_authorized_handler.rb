@@ -94,7 +94,7 @@ module Tresor
             subject_id = connection.subject_id
             attributes = connection.subject_attributes
             service_uuid = get_service_uuid(connection)
-            uri = connection.parsed_request_uri.request_uri
+            uri = connection.parsed_request_uri.respond_to?(:request_uri) ? connection.parsed_request_uri : connection.parsed_request_uri.to_s
             http_method = connection.http_parser.http_method.downcase
 
             xacml_request = xacml_request_template.result(binding)
