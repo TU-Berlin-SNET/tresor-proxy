@@ -144,6 +144,8 @@ module Tresor
             end
           rescue Exception => e
             connection.additional_headers_to_relay['TRESOR-XACML-Exception'] = "#{e.to_s}|#{e.backtrace.join(',')}"
+
+            return false
           end
         end
 
