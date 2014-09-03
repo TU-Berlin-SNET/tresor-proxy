@@ -9,6 +9,7 @@ module Tresor
     autoload :TCTPDiscoveryFrontendHandler
     autoload :TCTPHalecCreationFrontendHandler
     autoload :TCTPHandshakeFrontendHandler
+    autoload :TresorProxyFrontendHandler
 
     autoload :ClaimSSO
   end

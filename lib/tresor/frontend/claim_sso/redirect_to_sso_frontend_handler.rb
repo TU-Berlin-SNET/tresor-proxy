@@ -8,7 +8,7 @@ module Tresor
           # @param [Tresor::Proxy::Connection] connection
           def can_handle?(connection)
             connection.proxy.is_sso_enabled &&
-            !connection.http_parser.headers['Host'].start_with?(connection.proxy.hostname) &&
+            !connection.request_is_for_proxy &&
             connection.sso_session == nil
           end
         end

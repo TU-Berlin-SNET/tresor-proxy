@@ -5,6 +5,7 @@ module Tresor
 
       autoload :RedirectToSSOFrontendHandler
       autoload :ClaimSSOSecurityToken
+      autoload :ProcessSAMLResponseFrontendHandler
     end
   end
 end

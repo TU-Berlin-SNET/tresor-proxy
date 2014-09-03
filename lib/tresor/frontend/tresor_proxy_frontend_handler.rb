@@ -4,7 +4,7 @@ module Tresor
       class << self
         def can_handle?(connection)
           connection.http_parser.headers['Host'] &&
-          connection.http_parser.headers['Host'].start_with?(connection.proxy.hostname)
+          connection.request_is_for_proxy
         end
 
         def build_hello_message

@@ -28,10 +28,27 @@ module Tresor
 
         if(sso_session = @backend.client_connection.sso_session)
           client_headers << {"TRESOR-Identity" => sso_session.name_id}
+          client_headers << {"TRESOR-Organization" => sso_session.organization} if sso_session.organization
 
           sso_session.attributes_hash.each do |attribute, values|
             values.each do |value|
               client_headers << {"TRESOR-Attribute" => "#{attribute} #{value}"}
+            end
+          end
+        end
+
+        requested_host = backend.client_connection.host.partition(':').first
+
+        reverse_host = backend.client_connection.proxy.reverse_mappings[requested_host]
+
+        if(reverse_host)
+          client_headers.each do |headers_hash|
+            headers_hash.each do |key, value|
+              if(key.casecmp('host') == 0)
+                parsed_host = URI(reverse_host)
+
+                headers_hash[key] = "#{parsed_host.hostname}:#{parsed_host.port}".gsub(/\:(80|443)\Z/, '')
+              end
             end
           end
         end

@@ -18,6 +18,12 @@ module Tresor
           @parsed.xpath('//assertion:NameID', {'assertion' => 'urn:oasis:names:tc:SAML:2.0:assertion'})[0].text
         end
 
+        def organization
+          organizations = attributes_hash['http://schemas.tresor.com/claims/2014/04/organization']
+
+          organizations ? organizations[0] : nil
+        end
+
         def attributes
           @parsed.xpath('//assertion:AttributeStatement/assertion:Attribute', {'assertion' => 'urn:oasis:names:tc:SAML:2.0:assertion'})
         end

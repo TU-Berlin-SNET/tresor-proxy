@@ -262,5 +262,9 @@ module Tresor::Proxy
         nil
       end
     end
+
+    def request_is_for_proxy
+      @http_parser.headers['Host'].eql?("#{proxy.hostname}:#{proxy.port}".gsub(/\:(80|443)\Z/, ''))
+    end
   end
 end

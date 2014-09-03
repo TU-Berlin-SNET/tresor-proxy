@@ -33,7 +33,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
       end
 
       # Send Host header of reverse URL
-      if header.eql? 'Host'
+      if header.casecmp('host') == 0
         headers << {'Host' => @backend.host}
       else
         headers << {header => value}
