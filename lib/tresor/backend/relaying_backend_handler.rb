@@ -18,37 +18,19 @@ module Tresor
       end
 
       def send_headers_to_backend_connection
+        request = backend.client_connection.request
         start_line = build_start_line
 
         log.debug (log_key) { "Relaying to backend: #{start_line}" }
 
         backend_connection.send_data start_line
 
-        client_headers = [backend.client_connection.client_headers]
+        client_headers = [request.client_headers.dup]
 
-        if(sso_session = @backend.client_connection.sso_session)
-          client_headers << {"TRESOR-Identity" => sso_session.name_id}
-          client_headers << {"TRESOR-Organization" => sso_session.organization} if sso_session.organization
-
-          sso_session.attributes_hash.each do |attribute, values|
-            values.each do |value|
-              client_headers << {"TRESOR-Attribute" => "#{attribute} #{value}"}
-            end
-          end
-        end
-
-        requested_host = backend.client_connection.host.partition(':').first
-
-        reverse_host = backend.client_connection.proxy.reverse_mappings[requested_host]
-
-        if(reverse_host)
-          client_headers.each do |headers_hash|
-            headers_hash.each do |key, value|
-              if(key.casecmp('host') == 0)
-                parsed_host = URI(reverse_host)
-
-                headers_hash[key] = "#{parsed_host.hostname}:#{parsed_host.port}".gsub(/\:(80|443)\Z/, '')
-              end
+        client_headers.each do |headers_hash|
+          headers_hash.each do |key, value|
+            if(key.casecmp('host') == 0)
+              headers_hash[key] = "#{request.effective_backend_host}"
             end
           end
         end
@@ -66,9 +48,26 @@ module Tresor
         backend_connection.send_data chunk
       end
 
+      def on_backend_headers_complete(headers)
+        relay "HTTP/1.1 #{backend_connection.http_parser.status_code}\r\n"
+
+        # Thats better
+        headers.delete('Content-Length') if headers['Transfer-Encoding']
+
+        # TODO Handle "Connection" response header from backend
+        if(headers['Connection'])
+          puts headers['Connection']
+        end
+
+        relay_backend_headers headers
+        relay_additional_headers
+
+        relay "\r\n"
+      end
+
       def on_client_message_complete
         if @request_has_body
-          if backend.client_connection.http_parser.headers['Transfer-Encoding'].eql?('chunked')
+          if backend.client_connection.request.chunked?
             send_client_trailer_chunk
           end
         end
@@ -102,30 +101,11 @@ module Tresor
 
       # Relays additional headers
       def relay_additional_headers
-        @backend.client_connection.additional_headers_to_relay.each do |header, value|
-          relay "#{header}: #{value}\r\n"
-        end
-      end
-
-      def on_backend_headers_complete(headers)
-        relay "HTTP/1.1 #{backend_connection.http_parser.status_code}\r\n"
-
-        # Thats better
-        headers.delete('Content-Length') if headers['Transfer-Encoding']
-
-        if(headers['Connection'])
-          puts headers['Connection']
-        end
-
-        relay_backend_headers headers
-
-        relay_additional_headers
-
-        relay "\r\n"
+        relay_backend_headers backend.client_connection.request.additional_headers_to_relay
       end
 
       def client_transfer_chunked?
-        backend_connection.http_parser.headers['Transfer-Encoding'] && backend_connection.http_parser.headers['Transfer-Encoding'].eql?('chunked')
+        backend_connection.http_parser.headers['Transfer-Encoding'].eql?('chunked')
       end
 
       def on_backend_body(chunk)

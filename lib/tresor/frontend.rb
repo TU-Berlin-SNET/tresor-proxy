@@ -11,6 +11,8 @@ module Tresor
     autoload :TCTPHandshakeFrontendHandler
     autoload :TresorProxyFrontendHandler
 
+    autoload :HTTPMutexes
+    autoload :XACML
     autoload :ClaimSSO
   end
 end

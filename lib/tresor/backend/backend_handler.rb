@@ -29,7 +29,9 @@ module Tresor
       end
 
       def build_start_line
-        "#{backend.client_connection.http_method} #{backend.client_connection.path}#{backend.client_connection.query ? "?#{backend.client_connection.query}": ''} HTTP/1.1\r\n"
+        request = backend.client_connection.request
+
+        "#{request.http_method} #{request.requested_http_request_url} HTTP/1.1\r\n"
       end
 
       def on_backend_headers_complete

@@ -3,12 +3,18 @@ module Tresor
     module ClaimSSO
       class ProcessSAMLResponseFrontendHandler < Tresor::Frontend::FrontendHandler
         class << self
+          include Tresor::Frontend::CommunicatesWith
+        end
+
+        communicates_with :broker, :tresor_broker_url
+
+        class << self
           # @param [Tresor::Proxy::Connection] connection
           def can_handle?(connection)
             connection.proxy.is_sso_enabled &&
-            connection.http_parser.headers['Host'].start_with?(connection.proxy.hostname) &&
-            connection.http_parser.http_method.eql?('POST') &&
-            connection.query_vars['wdycf_url']
+            connection.request.http_origin? &&
+            connection.request.http_method.eql?('POST') &&
+            connection.request.query_vars['wdycf_url']
           end
         end
 
@@ -19,28 +25,67 @@ module Tresor
 
         def on_message_complete
           if @sso_response
-            parsed_sso_response = Hash[URI.decode_www_form(@sso_response.string)]
+            EM.defer do
+              parsed_sso_response = Hash[URI.decode_www_form(@sso_response.string)]
 
-            security_token = ClaimSSOSecurityToken.new(parsed_sso_response['wresult'])
-            new_id = SecureRandom.urlsafe_base64
+              security_token = ClaimSSOSecurityToken.new(parsed_sso_response['wresult'])
 
-            connection.proxy.sso_sessions[new_id] = security_token
+              broker_url = URI(connection.proxy.tresor_broker_url)
 
-            wdycf_url = build_wdycf_url(new_id)
+              http_request = Net::HTTP::Get.new("/clients/tresor_organization_ids/#{security_token.organization}")
+              http_request['Host'] = "#{broker_url.host}:#{broker_url.port}"
 
-            # Redirect to where-do-you-come-from-url
-            connection.send_data "HTTP/1.1 302 Found \r\n"
-            connection.send_data "Host: #{connection.proxy.hostname}\r\n"
-            connection.send_data "Content-Length: #{build_html_response(wdycf_url).length}\r\n"
-            connection.send_data "Location: #{wdycf_url}\r\n\r\n"
-            connection.send_data build_html_response(wdycf_url)
+              if(broker_url.userinfo)
+                user, pw = broker_url.userinfo.split(':')
+                http_request.basic_auth(user, pw)
+              end
+
+              security_token.tresor_organization_uuid = begin
+                http_response = communicate_with_broker(connection) do |http|
+                  http.request(http_request)
+                end
+
+                if(http_response.code == '200')
+                  http_response.body
+                else
+                  'unknown'
+                end
+              rescue Exception => e
+                connection.additional_headers_to_relay['TRESOR-Broker-Exception'] = "#{e.to_s}|#{e.backtrace.join(',')}"
+
+                'unknown'
+              end
+
+              new_id = SecureRandom.urlsafe_base64
+
+              connection.proxy.sso_sessions[new_id] = security_token
+
+              wdycf_url = build_wdycf_url(new_id)
+
+              # Redirect to where-do-you-come-from-url
+              EM.schedule do
+                connection.send_data "HTTP/1.1 302 Found \r\n"
+                connection.send_data "Host: #{connection.proxy.hostname}\r\n"
+                connection.send_data "Content-Length: #{build_html_response(wdycf_url).length}\r\n"
+                connection.send_data "Location: #{wdycf_url}\r\n\r\n"
+                connection.send_data build_html_response(wdycf_url)
+              end
+            end
           else
             connection.send_error_response Exception.new('SSO token missing')
           end
         end
 
         def build_wdycf_url(id)
-          "#{connection.query_vars['wdycf_url']}?tresor_sso_id=#{id}"
+          parsed_wdycf_url = URI(connection.request.query_vars['wdycf_url'])
+
+          if parsed_wdycf_url.query.present?
+            parsed_wdycf_url.query += "&tresor_sso_id=#{id}"
+          else
+            parsed_wdycf_url.query = "tresor_sso_id=#{id}"
+          end
+
+          parsed_wdycf_url.to_s
         end
 
         def build_html_response(url)

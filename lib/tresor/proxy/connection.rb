@@ -27,11 +27,6 @@ module Tresor::Proxy
       end
     end
 
-    # The HTTP parser used for parsing the client request
-    # @return [HTTP::Parser]
-    # @!attr [r] http_parser
-    attr :http_parser
-
     # The IP address of the connected client
     # @return [String]
     # @!attr [r] client_ip
@@ -42,14 +37,14 @@ module Tresor::Proxy
     # @!attr [r] client_port
     attr :client_port
 
-    # The headers the client sent
-    # @return [Hash]
-    # @!attr [r] client_headers
-    attr :client_headers
-
     # The current TRESOR proxy instance
     # @return [Tresor::Proxy::TresorProxy]
     attr :proxy
+
+    # The current request
+    # @!attr [rw] request
+    # @return [Tresor::Proxy::Request]
+    attr_accessor :request
 
     # The future handler, which is used to serve the client request.
     # @!attr [rw] frontend_handler_future The future frontend handler
@@ -61,11 +56,6 @@ module Tresor::Proxy
     # @return [Tresor::Frontend::FrontendHandler] The handler
     attr_accessor :frontend_handler
 
-    # Additional headers, which are to be relayed to the client.
-    # @!attr [rw] additional_headers_to_relay
-    # @return [Hash] The additional headers
-    attr_accessor :additional_headers_to_relay
-
     # Initializes the connection by setting the proxy reference and resetting the HTTP parser
     # @param [Tresor::Proxy::Proxy] proxy The proxy reference
     def initialize(proxy)
@@ -75,12 +65,9 @@ module Tresor::Proxy
 
       # Create backend as soon as all headers are complete
       http_parser.on_headers_complete = proc do |headers|
-        @cookies, @query_vars, @parsed_request_uri = nil, nil, nil
+        @request = Tresor::Proxy::Request.new(self, @http_parser)
 
-        @client_headers = headers
-        @additional_headers_to_relay = {}
-
-        log.debug (log_key) {"Headers complete. Request is #{@http_parser.http_method} #{@http_parser.request_url} HTTP/1.1"}
+        log.debug (log_key) {"Headers complete. Request is #{@request.http_method} #{@request.request_url} HTTP/1.1"}
 
         decide_frontend_handler
       end
@@ -101,8 +88,8 @@ module Tresor::Proxy
     def decide_frontend_handler
       @frontend_handler_future = EM::DefaultDeferrable.new
 
-      @frontend_handler_future.errback do
-        throw Exception.new('No frontend handler can handle request!')
+      @frontend_handler_future.errback do |error|
+        send_error_response error
       end
 
       EM.defer do
@@ -113,14 +100,14 @@ module Tresor::Proxy
         end
 
         EM.schedule do
-          if !frontend_handler_class.eql? NilClass
+          if frontend_handler_class.present?
             log.debug (log_key) { "Set frontend handler to #{frontend_handler_class.name}" }
 
             @frontend_handler = frontend_handler_class.new(self)
 
             @frontend_handler_future.succeed @frontend_handler
           else
-            @frontend_handler_future.fail
+            @frontend_handler_future.fail Exception.new('No frontend handler can handle request!')
           end
         end
       end
@@ -169,102 +156,20 @@ module Tresor::Proxy
       super(data)
     end
 
+    def relay_additional_headers
+      request.additional_headers_to_relay.each do |hash|
+        send_data "#{hash.keys.first}: #{hash.values.first}\r\n"
+      end
+    end
+
     def log_key
       "#{@proxy.name} - Client #{@client_ip}:#{@client_port}"
     end
 
-    def host
-      @client_headers['Host']
-    end
-
-    def http_method
-      http_parser.http_method
-    end
-
-    def path
-      parsed_request_uri.path
-    end
-
-    def query
-      parsed_request_uri.query
-    end
-
-    # Returns the parsed request URI
-    # @return [URI::HTTP]
-    def parsed_request_uri
-      unless @parsed_request_uri
-        @parsed_request_uri = URI.parse(http_parser.request_url)
-        @parsed_request_uri.path = '/' if @parsed_request_uri.path.eql?('')
-      end
-
-      @parsed_request_uri
-    end
-
-    # Uses the HTTP parser to parse the cookies
-    # @return [Hash] Cookies as Hash
-    def cookies
-      unless @cookies
-        http_cookie_header = http_parser.headers['Cookie']
-
-        if http_cookie_header
-          begin
-            @cookies = Hash[http_cookie_header.split(';').map{|c| c.strip.split('=', 2)}]
-          rescue Exception
-            @cookies = {}
-          end
-        else
-          @cookies = {}
-        end
-      end
-
-      @cookies
-    end
-
-    # Parses the query vars
-    # @return [Hash{String => String}]
-    def query_vars
-      unless @query_vars
-        http_query = parsed_request_uri.query
-
-        if http_query
-          begin
-            @query_vars = Hash[http_query.split('&').map{|q| q.split('=')}]
-          rescue Exception
-            @query_vars = {}
-          end
-        else
-          @query_vars = {}
-        end
-      end
-
-      @query_vars
-    end
-
-    # Gets the authorized subject ID
-    # @return [String]
-    def subject_id
-      sso_session ? sso_session.name_id : nil
-    end
-
-    def subject_attributes
-      sso_session ? sso_session.attributes_hash : {}
-    end
-
-    # Gets the SSO id, either from cookie or from query string
-    def sso_id
-      query_vars['tresor_sso_id'] || cookies['tresor_sso_id']
-    end
-
-    def sso_session
-      if sso_id
-        proxy.sso_sessions[sso_id]
-      else
-        nil
-      end
-    end
-
-    def request_is_for_proxy
-      @http_parser.headers['Host'].eql?("#{proxy.hostname}:#{proxy.port}".gsub(/\:(80|443)\Z/, ''))
-    end
+    # The HTTP parser used for parsing the client request
+    # @return [HTTP::Parser]
+    # @!attr [r] http_parser
+    private
+      attr :http_parser
   end
 end

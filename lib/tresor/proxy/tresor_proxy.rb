@@ -88,22 +88,22 @@ module Tresor::Proxy
     attr_accessor :tresor_broker_url
 
     ##
-    # Callback for when the proxy is started.
+    # Proc for when the proxy is started.
     #
     # Contains a block, which sets +started+ to +true+.
     #
     # @!attribute [r] start_callback
-    # @return [EventMachine::DefaultDeferrable]
-    attr :start_callback
+    # @return [Proc]
+    attr :start_proc
 
     ##
-    # Callback for when the proxy is stopped.
+    # Proc for when the proxy is stopped.
     #
     # Contains a block, which sets +started+ to +false+.
     #
     # @!attribute [r] stop_callback
-    # @return [EventMachine::DefaultDeferrable]
-    attr :stop_callback
+    # @return [Proc]
+    attr :stop_proc
 
     def initialize(ip, hostname, port, name = "TRESOR Proxy", tls = false, tls_key = nil, tls_crt = nil)
       @ip = ip
@@ -118,13 +118,11 @@ module Tresor::Proxy
       @reverse_mappings = {}
       @sso_sessions = {}
 
-      @start_callback = EventMachine::DefaultDeferrable.new
-      @start_callback.callback do
+      @start_proc = proc do
         @started = true
       end
 
-      @stop_callback = EventMachine::DefaultDeferrable.new
-      @stop_callback.callback do
+      @stop_proc = proc do
         @started = false
       end
     end
@@ -133,6 +131,7 @@ module Tresor::Proxy
       begin
         EM.epoll
         EM.run do
+          trap("KILL") { stop }
           trap("TERM") { stop }
           trap("INT")  { stop }
 
@@ -148,7 +147,7 @@ module Tresor::Proxy
 
           log.info { "#{@name} started on #{@ip}:#{@port}" }
 
-          start_callback.succeed
+          @start_proc.call
         end
       rescue Exception => e
         log.fatal { "Error in TRESOR Proxy: #{e}" }
@@ -159,9 +158,15 @@ module Tresor::Proxy
     end
 
     def stop
-      EventMachine.stop
+      EventMachine.stop_event_loop
 
-      @stop_callback.succeed
+      @stop_proc.call
+
+      exit(0)
+    end
+
+    def scheme
+      tls ? 'https' : 'http'
     end
 
     def log

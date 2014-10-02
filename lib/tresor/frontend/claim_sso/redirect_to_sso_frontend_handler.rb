@@ -8,8 +8,8 @@ module Tresor
           # @param [Tresor::Proxy::Connection] connection
           def can_handle?(connection)
             connection.proxy.is_sso_enabled &&
-            !connection.request_is_for_proxy &&
-            connection.sso_session == nil
+            !connection.request.http_origin? &&
+            connection.request.sso_session.blank?
           end
         end
 
@@ -24,7 +24,7 @@ module Tresor
 
         def on_message_complete
           connection.send_data "HTTP/1.1 302 Found\r\n"
-          connection.send_data "Host: #{connection.http_parser.headers['Host']}\r\n"
+          connection.send_data "Host: #{connection.request.requested_http_host}\r\n"
           # TODO Send wct
           connection.send_data "Content-Length: #{build_http_response.length}\r\n"
           connection.send_data "Location: #{build_redirect_url}\r\n\r\n"
@@ -38,9 +38,11 @@ module Tresor
         end
 
         def build_wtrealm_url
-          wdycf_url = "http://#{connection.http_parser.headers['Host']}#{URI(connection.http_parser.request_url).path}"
+          wdycf_url = connection.request.effective_request_url.to_s
 
-          return URI.encode_www_form_component("http://#{connection.proxy.hostname}:#{connection.proxy.port}/?wdycf_url=#{wdycf_url}")
+          wtrealm_url = URI("#{connection.proxy.scheme}://#{connection.proxy.hostname}:#{connection.proxy.port}/?wdycf_url=#{wdycf_url}")
+
+          return URI.encode_www_form_component(wtrealm_url.to_s)
         end
 
         def build_whr_url

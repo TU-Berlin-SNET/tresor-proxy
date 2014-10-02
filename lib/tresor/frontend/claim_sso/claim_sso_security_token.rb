@@ -10,6 +10,8 @@ module Tresor
         # @!attr [r] parsed
         attr :parsed
 
+        attr_accessor :tresor_organization_uuid
+
         def initialize(xml_string)
           @parsed = Nokogiri.XML(xml_string)
         end

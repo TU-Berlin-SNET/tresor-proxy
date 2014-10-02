@@ -5,7 +5,7 @@ module Tresor
         def can_handle?(connection)
           connection.proxy.is_tctp_server && (
                 connection.http_parser.headers['Accept-Encoding'].eql?('encrypted') ||
-                connection.http_parser.headers{'Content-Encoding'}.eql?('encrypted')
+                connection.http_parser.headers['Content-Encoding'].eql?('encrypted')
           )
         end
       end

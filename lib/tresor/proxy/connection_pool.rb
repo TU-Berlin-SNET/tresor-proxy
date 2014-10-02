@@ -16,73 +16,46 @@ module Tresor::Proxy
     # @param [Tresor::Proxy::Connection] connection
     # @param [Tresor::Backend::BackendHandler] handler
     def get_backend_future(connection, handler)
-      # Forward proxy
-      if connection.http_parser.request_url.start_with?('http')
-        get_backend_future_for_forward_url(connection, handler)
-      else
-        get_backend_future_for_reverse_host(connection, handler)
-      end
-    end
-
-    # @param [Tresor::Proxy::Connection] connection
-    def get_backend_future_for_forward_url(connection, handler, host = nil, port = nil)
-      uri = connection.parsed_request_uri
-
-      get_backend_future_for_host(uri.hostname, uri.port, uri.host, connection, handler)
-    end
-
-    # @param [Tresor::Proxy::Connection] connection
-    def get_backend_future_for_reverse_host(connection, handler)
-      requested_host = connection.host.partition(':').first
-
-      reverse_host = @proxy.reverse_mappings[requested_host]
-
-      if reverse_host
-        parsed_reverse_host = URI(reverse_host)
-
-        get_backend_future_for_host(parsed_reverse_host.hostname, parsed_reverse_host.port, requested_host, connection, handler)
-      else
-        backend_future = EventMachine::DefaultDeferrable.new
-        backend_future.fail "This proxy is not configured to reverse proxy #{requested_host}"
-        backend_future
-      end
-    end
-
-    # @param [Tresor::Proxy::Connection] client_connection
-    def get_backend_future_for_host(host, port, http_hostname, client_connection, handler)
       backend_future = EventMachine::DefaultDeferrable.new
 
       EM.defer do
-        begin
-          ip = resolve_host(host)
+        request = connection.request
 
-          connection_key = "#{ip}:#{port}"
+        if request.http_relay?
+          begin
+            ip = resolve_host(request.effective_backend_url.host)
+            port = request.effective_backend_url.port
 
-          backend = nil
+            connection_key = "#{ip}:#{port}"
 
-          @pool_mutex.synchronize do
-            @free_backends[connection_key] ||= []
+            backend = nil
 
-            backend = @free_backends[connection_key].pop
+            @pool_mutex.synchronize do
+              @free_backends[connection_key] ||= []
+
+              backend = @free_backends[connection_key].pop
+            end
+
+            if backend.nil?
+              backend = EventMachine::connect(ip, port, Tresor::Backend::BackendConnection, proxy, connection_key, handler)
+
+              log.debug (log_key) { "Created connection #{backend.__id__} to #{connection_key} (Host: #{request.effective_backend_url.host})" }
+            else
+              backend.backend_handler = handler
+
+              log.debug (log_key) { "Reusing connection #{backend.__id__} to #{connection_key} (Host: #{request.effective_backend_url.host})" }
+            end
+
+            EM.schedule do
+              backend_future.succeed backend
+            end
+          rescue SocketError => e
+            EM.schedule do
+              backend_future.fail e
+            end
           end
-
-          if backend.nil?
-            backend = EventMachine::connect(ip, port, Tresor::Backend::BackendConnection, proxy, connection_key, handler)
-
-            log.debug (log_key) { "Created connection #{backend.__id__} to #{connection_key} (Host: #{http_hostname})" }
-          else
-            backend.backend_handler = handler
-
-            log.debug (log_key) { "Reusing connection #{backend.__id__} to #{connection_key} (Host: #{http_hostname})" }
-          end
-
-          EM.schedule do
-            backend_future.succeed backend
-          end
-        rescue SocketError => e
-          EM.schedule do
-            backend_future.fail e
-          end
+        else
+          backend_future.fail Exception.new("HTTP request cannot be relayed.")
         end
       end
 

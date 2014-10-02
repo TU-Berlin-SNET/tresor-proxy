@@ -2,12 +2,15 @@ module Tresor
   module Frontend
     class HTTPRelayFrontendHandler < FrontendHandler
       class << self
+        # @param [Tresor::Proxy::Connection] connection
         def can_handle?(connection)
-          # TODO Test for configured reverse / forward functionality
-          true
+          connection.request.http_relay?
         end
       end
 
+      # The backend, to which the request should be sent
+      # !@attr [rw] backend
+      # @return [Tresor::Backend::Backend]
       attr_accessor :backend
 
       # Initializes this HTTP relay handler by getting a backend future
@@ -16,14 +19,6 @@ module Tresor
         super(connection)
 
         @has_request_body = false
-
-        if connection.proxy.is_sso_enabled
-          sso_id = connection.query_vars['tresor_sso_id']
-
-          if sso_id
-            connection.additional_headers_to_relay['Set-Cookie'] = "tresor_sso_id=#{sso_id}; path=/"
-          end
-        end
 
         @backend = Tresor::Backend::Backend.new(connection)
       end

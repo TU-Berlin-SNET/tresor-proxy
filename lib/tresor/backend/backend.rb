@@ -5,7 +5,6 @@ module Tresor
       # @!attr [r] proxy
       # @return [Tresor::Proxy::TresorProxy]
       attr :proxy
-      attr_accessor :host
 
       # The client connection
       # @return [Tresor::Proxy::Connection] The client connection
@@ -35,15 +34,18 @@ module Tresor
       def decide_handler
         log.debug (log_key) { "Deciding Handler" }
 
+        tctp_key = client_connection.request.effective_backend_scheme_authority
+        path = client_connection.request.request_url.path
+
         if proxy.is_tctp_client
-          if Tresor::TCTP.tctp_status_known?(client_connection.host)
-            if Tresor::TCTP.is_tctp_server?(client_connection.host) && Tresor::TCTP.is_tctp_protected?(client_connection.host, client_connection.path)
+          if Tresor::TCTP.tctp_status_known?(tctp_key)
+            if Tresor::TCTP.is_tctp_server?(tctp_key) && Tresor::TCTP.is_tctp_protected?(tctp_key, path)
               begin
-                promise = @proxy.halec_registry.promise_for(client_connection.host, client_connection.path)
+                promise = @proxy.halec_registry.promise_for(tctp_key, path)
 
                 @backend_handler = TCTPEncryptToBackendHandler.new(self, promise)
               rescue Tresor::TCTP::HALECUnavailable
-                log.debug (log_key) { "Performing TCTP handshake to create HALEC for #{client_connection.host}" }
+                log.debug (log_key) { "Performing TCTP handshake to create HALEC for #{tctp_key}" }
 
                 # Use this backend connection for TCTP handshake
                 @backend_handler = TCTPHandshakeBackendHandler.new(self)

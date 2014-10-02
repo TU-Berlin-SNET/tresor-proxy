@@ -4,6 +4,9 @@
     <Attribute AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id" IncludeInResult="false">
       <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string"><%= subject_id %></AttributeValue>
     </Attribute>
+    <Attribute AttributeId="http://schemas.cloud-tresor.com/request/2014/09/tresor-organization-uuid" IncludeInResult="false">
+      <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string"><%= tresor_organization_uuid %></AttributeValue>
+    </Attribute>
     <% attributes.each do |name, values| %>
     <Attribute AttributeId="<%= name %>" IncludeInResult="false">
       <% values.each do |value| %>
@@ -13,7 +16,7 @@
     <% end %>
   </Attributes>
   <Attributes Category="urn:oasis:names:tc:xacml:3.0:attribute-category:resource">
-    <Attribute AttributeId="http://schemas.tresor.com/request/2014/04/service-uuid" IncludeInResult="false">
+    <Attribute AttributeId="http://schemas.cloud-tresor.com/request/2014/04/service-uuid" IncludeInResult="false">
       <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string"><%= service_uuid %></AttributeValue>
     </Attribute>
     <Attribute AttributeId="urn:oasis:names:tc:xacml:1.0:resource:resource-id" IncludeInResult="false">

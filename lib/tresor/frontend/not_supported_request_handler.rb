@@ -3,7 +3,7 @@ module Tresor
     class NotSupportedRequestHandler < FrontendHandler
       class << self
         def can_handle?(connection)
-          connection.http_parser.http_method.eql?('CONNECT')
+          connection.request.http_method.eql?('CONNECT')
         end
       end
 
@@ -19,7 +19,7 @@ module Tresor
       end
 
       def on_message_complete
-        if connection.http_parser.http_method.eql?('CONNECT')
+        if connection.request.http_method.eql?('CONNECT')
           connection.send_data "HTTP/1.1 405 Method Not Allowed\r\n"
           connection.send_data "Allow: GET, HEAD, POST, PUT, DELETE, TRACE\r\n"
           connection.send_data "Content-Length: 0\r\n"

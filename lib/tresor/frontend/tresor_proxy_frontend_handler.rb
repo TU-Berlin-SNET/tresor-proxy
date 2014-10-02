@@ -3,8 +3,7 @@ module Tresor
     class TresorProxyFrontendHandler < FrontendHandler
       class << self
         def can_handle?(connection)
-          connection.http_parser.headers['Host'] &&
-          connection.request_is_for_proxy
+          connection.request.http_origin?
         end
 
         def build_hello_message

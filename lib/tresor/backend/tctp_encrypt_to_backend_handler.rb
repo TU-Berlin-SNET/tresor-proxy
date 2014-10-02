@@ -34,7 +34,8 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
 
       # Send Host header of reverse URL
       if header.casecmp('host') == 0
-        headers << {'Host' => @backend.host}
+        headers << {'Host' => "#{backend.client_connection
+        }:#{parsed_host.port}".gsub(/\:(80|443)\Z/, '')}
       else
         headers << {header => value}
       end
@@ -56,7 +57,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
   def on_backend_headers_complete(backend_headers)
     relay "HTTP/1.1 #{backend_connection.http_parser.status_code}\r\n"
 
-    @encrypted_response = backend_headers['Content-Encoding'] && backend_headers['Content-Encoding'].eql?('encrypted')
+    @encrypted_response = backend_headers['Content-Encoding'].eql?('encrypted')
 
     @has_body = backend_headers['Transfer-Encoding'] || (backend_headers['Content-Length'] && !backend_headers['Content-Length'].eql?("0"))
 
