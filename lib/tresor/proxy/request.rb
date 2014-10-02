@@ -252,7 +252,7 @@ module Tresor::Proxy
     # which comes before the first dot.
     # @return [String]
     def service_name
-      requested_http_host[/(.+)(?=\.)/]
+      requested_http_host[/(.+?)(?=\.)/]
     end
 
     memoize :effective_request_url, :reverse_url, :effective_backend_url, :request_url, :http_forward?, :http_reverse?, :http_origin?, :http_relay?, :cookies, :query_vars
