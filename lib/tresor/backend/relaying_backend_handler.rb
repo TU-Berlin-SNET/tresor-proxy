@@ -37,6 +37,8 @@ module Tresor
 
         send_client_headers(client_headers)
 
+        send_additional_client_headers
+
         backend_connection.send_data "\r\n"
       end
 
@@ -102,6 +104,10 @@ module Tresor
       # Relays additional headers
       def relay_additional_headers
         relay_backend_headers backend.client_connection.request.additional_headers_to_relay
+      end
+
+      def send_additional_client_headers
+        send_client_headers backend.client_connection.request.additional_headers_to_send
       end
 
       def client_transfer_chunked?

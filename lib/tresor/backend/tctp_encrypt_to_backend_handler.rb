@@ -51,6 +51,8 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
 
     send_client_headers headers
 
+    send_additional_client_headers
+
     backend_connection.send_data "\r\n"
   end
 

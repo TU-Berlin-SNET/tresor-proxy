@@ -107,7 +107,7 @@ module Tresor::Proxy
 
             @frontend_handler_future.succeed @frontend_handler
           else
-            @frontend_handler_future.fail Exception.new('No frontend handler can handle request!')
+            @frontend_handler_future.fail Exception.new('Cannot forward request.')
           end
         end
       end

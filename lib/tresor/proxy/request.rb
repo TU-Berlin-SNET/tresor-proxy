@@ -263,8 +263,8 @@ module Tresor::Proxy
 
     private
       def add_forward_headers
-        if http_forward?
-          @additional_headers_to_send << {'X-Forwarded-Host' => "#{request_url.host}:#{request_url.port}"}
+        if http_reverse?
+          @additional_headers_to_send << {'X-Forwarded-Host' => requested_http_host}
         end
       end
 
