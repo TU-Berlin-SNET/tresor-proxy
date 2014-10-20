@@ -40,7 +40,11 @@ module Tresor
             connection.request.additional_headers_to_relay << {'TRESOR-Broker-Response' => http_response.body.gsub("\n", '')}
 
             if(http_response.code == '200')
-              return http_response.body
+              service_uuid = http_response.body
+
+              connection.request.additional_headers_to_send << {'TRESOR-Service-UUID' => service_uuid}
+
+              return service_uuid
             else
               return 'unknown'
             end
