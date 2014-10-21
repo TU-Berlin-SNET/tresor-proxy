@@ -2,7 +2,6 @@
 doc
 profiles
 spec/**.txt
-Gemfile.lock
 .idea
 profile-results
 trace.bin
