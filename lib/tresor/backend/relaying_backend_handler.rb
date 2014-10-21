@@ -103,11 +103,11 @@ module Tresor
 
       # Relays additional headers
       def relay_additional_headers
-        relay_backend_headers backend.client_connection.request.additional_headers_to_relay
+        relay_backend_headers request.additional_headers_to_relay
       end
 
       def send_additional_client_headers
-        send_client_headers backend.client_connection.request.additional_headers_to_send
+        send_client_headers request.additional_headers_to_send
       end
 
       def client_transfer_chunked?

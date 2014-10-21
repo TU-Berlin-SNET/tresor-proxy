@@ -13,9 +13,19 @@ module Tresor
       # @return [Tresor::Backend::BackendConnection]
       attr :backend_connection
 
+      # The current client connection
+      # @return [Tresor::Proxy::Connection]
+      attr :client_connection
+
+      # The current client request
+      # @return [Tresor::Proxy::Request]
+      attr :request
+
       # @param [Tresor::Backend::Backend] backend
       def initialize(backend)
         @backend = backend
+        @client_connection = @backend.client_connection
+        @request = @client_connection.request
 
         @backend_connection_future = backend.proxy.connection_pool.get_backend_future(backend.client_connection, self)
         @backend_connection_future.callback do |backend_connection|
@@ -31,7 +41,7 @@ module Tresor
       def build_start_line
         request = backend.client_connection.request
 
-        "#{request.http_method} #{request.requested_http_request_url} HTTP/1.1\r\n"
+        "#{request.http_method} #{request.effective_backend_request_url} HTTP/1.1\r\n"
       end
 
       def on_backend_headers_complete

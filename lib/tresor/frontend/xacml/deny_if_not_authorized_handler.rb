@@ -162,7 +162,7 @@ module Tresor
         end
 
         #TODO Give more specific error
-        return 'forbidden'
+        return 'Forbidden'
       end
     end
   end

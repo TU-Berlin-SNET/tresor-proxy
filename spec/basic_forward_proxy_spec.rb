@@ -22,16 +22,15 @@ describe 'A basic forward proxy' do
 
     Thread.new do @proxy.start end
     Thread.new do @thin_server.start end
-    until @proxy.started do Thread.pass end
-    until @thin_server.running? do Thread.pass end
+
+    sleep 2
   end
 
   after(:all) do
     @proxy.stop
     @thin_server.stop
 
-    while @proxy.started do Thread.pass end
-    while @thin_server.running? do Thread.pass end
+    sleep 2
   end
 
   let :proxy_uri do
@@ -40,10 +39,6 @@ describe 'A basic forward proxy' do
 
   let :request_uri do
     'http://127.0.0.1:43209'
-  end
-
-  it 'can be started' do
-    expect(@proxy.started).to be_true
   end
 
   it 'returns 502 error when trying to access a not configured reverse host' do

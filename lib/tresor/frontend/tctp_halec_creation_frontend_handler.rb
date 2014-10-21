@@ -4,8 +4,8 @@ module Tresor
       class << self
         def can_handle?(connection)
           connection.proxy.is_tctp_server &&
-          connection.http_parser.http_method.eql?('POST') &&
-          connection.http_parser.request_url.eql?('/halecs')
+          connection.request.http_method.eql?('POST') &&
+          connection.request.requested_http_request_url.eql?('/halecs')
         end
       end
 
@@ -24,7 +24,9 @@ module Tresor
       def on_message_complete
         @server_halec.engine.inject @handshake_data.join
 
-        halec_url = URI("http://#{connection.proxy.hostname}:#{connection.proxy.port}/halecs/#{Rack::TCTP::ServerHALEC.new_slug}")
+        halec_url = connection.request.effective_request_url.dup
+        halec_url.query = nil
+        halec_url.path = "/halecs/#{Rack::TCTP::ServerHALEC.new_slug}"
 
         @server_halec.engine.read
         handshake_response = @server_halec.engine.extract

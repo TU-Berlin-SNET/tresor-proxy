@@ -4,8 +4,8 @@ module Tresor
       class << self
         def can_handle?(connection)
           connection.proxy.is_tctp_server && (
-                connection.http_parser.headers['Accept-Encoding'].eql?('encrypted') ||
-                connection.http_parser.headers['Content-Encoding'].eql?('encrypted')
+                connection.request.client_headers['Accept-Encoding'].eql?('encrypted') ||
+                connection.request.client_headers['Content-Encoding'].eql?('encrypted')
           )
         end
       end
@@ -18,10 +18,10 @@ module Tresor
       def initialize(connection)
         super(connection)
 
-        connection.http_parser.headers.delete('Content-Encoding')
-        connection.http_parser.headers.delete('Accept-Encoding')
+        connection.request.client_headers.delete('Content-Encoding')
+        connection.request.client_headers.delete('Accept-Encoding')
 
-        connection.http_parser.headers['Transfer-Encoding'] = 'chunked' if (connection.http_parser.headers['Content-Length'] || connection.http_parser.headers['Transfer-Encoding'])
+        connection.request.client_headers['Transfer-Encoding'] = 'chunked' if (connection.request.client_headers['Content-Length'] || connection.request.client_headers['Transfer-Encoding'])
       end
 
       alias :super_on_body :on_body
@@ -52,7 +52,7 @@ module Tresor
         if @has_request_body
           log.debug (log_key) { 'Sent encrypted backend response to client.' }
 
-          backend.client_chunk "0\r\n\r\n" if connection.http_parser.headers['Transfer-Encoding'].eql? 'chunked'
+          backend.client_chunk "0\r\n\r\n" if connection.request.client_headers['Transfer-Encoding'].eql? 'chunked'
 
           connection.proxy.halec_registry.halecs(:server)[@server_halec.url] = @server_halec
 

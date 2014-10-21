@@ -28,16 +28,14 @@ describe 'A tctp client proxy' do
     Thread.new do @proxy.start end
     Thread.new do @webrick_server.start end
 
-    until @proxy.started do sleep 0.1 end
-    until @webrick_server.status.eql? :Running do sleep 0.1 end
+    sleep 2
   end
 
   after(:all) do
     @proxy.stop
     @webrick_server.stop
 
-    while @proxy.started do sleep 0.1 end
-    until @webrick_server.status.eql? :Stop do sleep 0.1 end
+    sleep 2
   end
 
   def proxy_uri

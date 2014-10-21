@@ -7,8 +7,8 @@ module Tresor
       class << self
         def can_handle?(connection)
           connection.proxy.is_tctp_server &&
-          connection.http_parser.http_method.eql?('OPTIONS') &&
-          connection.http_parser.headers['Accept'].eql?(DISCOVERY_MEDIA_TYPE)
+          connection.request.http_method.eql?('OPTIONS') &&
+          connection.request.client_headers['Accept'].eql?(DISCOVERY_MEDIA_TYPE)
         end
 
         def discovery_response

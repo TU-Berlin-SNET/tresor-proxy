@@ -8,20 +8,22 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
     @halec.engine.read
     client_hello = @halec.engine.extract
 
-    @handshake_url = Tresor::TCTP.handshake_url(backend.client_connection.host, backend.client_connection.path)
+    @tctp_key = request.effective_backend_scheme_authority
 
-    @tctp_cookie = backend.proxy.halec_registry.get_tctp_cookies(backend.client_connection.host).first
+    @handshake_url = Tresor::TCTP.handshake_url(@tctp_key, request.effective_backend_request_url)
+
+    @tctp_cookie = backend.proxy.halec_registry.get_tctp_cookies(@tctp_key).first
     @halec.tctp_session_cookie = @tctp_cookie
 
     backend_connection_future.callback do |backend_connection|
       backend_connection.send_data "POST #{@handshake_url} HTTP/1.1\r\n"
-      backend_connection.send_data "Host: #{backend.client_connection.host}\r\n"
+      backend_connection.send_data "Host: #{request.effective_backend_host}\r\n"
       backend_connection.send_data "Cookie: #{@tctp_cookie}\r\n" if @tctp_cookie
       backend_connection.send_data "Content-Length: #{client_hello.length}\r\n"
       backend_connection.send_data "Content-Type: application/octet-stream\r\n\r\n"
       backend_connection.send_data client_hello
 
-      log.debug (log_key) {"POSTed #{client_hello.length} bytes client_hello to #{@handshake_url} of host #{backend.client_connection.host}"}
+      log.debug (log_key) {"POSTed #{client_hello.length} bytes client_hello to #{@handshake_url} of host #{@tctp_key}"}
     end
   end
 
@@ -37,7 +39,7 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
 
       log.debug (log_key) {"Got HALEC cookie: #{@tctp_cookie}"}
 
-      backend.proxy.halec_registry.register_tctp_cookie(backend.client_connection.host, @tctp_cookie)
+      backend.proxy.halec_registry.register_tctp_cookie(@tctp_key, @tctp_cookie)
 
       @halec.tctp_session_cookie = @tctp_cookie
     end
@@ -75,7 +77,7 @@ class Tresor::Backend::TCTPHandshakeBackendHandler < Tresor::Backend::BackendHan
 
       backend_connection_future.callback do |backend_connection|
         backend_connection.send_data "POST #{@halec.url.path} HTTP/1.1\r\n"
-        backend_connection.send_data "Host: #{backend.client_connection.host}\r\n"
+        backend_connection.send_data "Host: #{request.effective_backend_host}\r\n"
         backend_connection.send_data "Cookie: #{@tctp_cookie}\r\n" if @tctp_cookie
         backend_connection.send_data "Content-Length: #{handshake_response.length}\r\n"
         backend_connection.send_data "Content-Type: application/octet-stream\r\n\r\n"

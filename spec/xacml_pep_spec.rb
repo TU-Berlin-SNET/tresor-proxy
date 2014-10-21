@@ -16,7 +16,7 @@ describe 'An XACML PEP proxy' do
     @proxy.xacml_pdp_rest_url = 'http://127.0.0.1:43221'
 
     @proxy.reverse_mappings = {
-        'sso_server' => 'http://127.0.0.1:43222'
+        'ssoserver:43220' => 'http://127.0.0.1:43222'
     }
 
     @proxy.sso_sessions = {
@@ -37,25 +37,31 @@ describe 'An XACML PEP proxy' do
       run XACML_PDP_MOCK_SERVER
     end
 
-    @webrick_sso_server = WEBrick::HTTPServer.new({:BindAddress => '127.0.0.1', :Port => 43222})
+    @webrick_sso_server = WEBrick::HTTPServer.new({:BindAddress => '127.0.0.1', :Port => 43222, :ServerName => 'ssoserver'})
     @webrick_sso_server.mount '/', Rack::Handler::WEBrick, @rack_stack_sso.to_app
 
-    @webrick_xacml_server = WEBrick::HTTPServer.new({:BindAddress => '127.0.0.1', :Port => 43221})
+    @webrick_xacml_server = WEBrick::HTTPServer.new({:BindAddress => '127.0.0.1', :Port => 43221, :ServerName => 'ssoserver'})
     @webrick_xacml_server.mount '/', Rack::Handler::WEBrick, @rack_stack_xacml.to_app
 
     Thread.new do @proxy.start end
     Thread.new do @webrick_sso_server.start end
     Thread.new do @webrick_xacml_server.start end
 
-    until @proxy.started do sleep 0.1 end
-    until @webrick_sso_server.status.eql? :Running do sleep 0.1 end
-    until @webrick_xacml_server.status.eql? :Running do sleep 0.1 end
+    sleep 2
+  end
+
+  after(:all) do
+    @proxy.stop
+    @webrick_sso_server.stop
+    @webrick_xacml_server.stop
+
+    sleep 2
   end
 
   it 'relays if XACML response is permit' do
     http = Net::HTTP.new('127.0.0.1', '43220')
     request = Net::HTTP::Get.new('/')
-    request['Host'] = 'sso_server'
+    request['Host'] = 'ssoserver:43220'
     request['Cookie'] = 'tresor_sso_id=testsession'
 
     Tresor::XACMLPDPMockServer.mock_action = :permit
@@ -73,7 +79,7 @@ describe 'An XACML PEP proxy' do
   it 'errs if XACML response is deny' do
     http = Net::HTTP.new('127.0.0.1', '43220')
     request = Net::HTTP::Get.new('/')
-    request['Host'] = 'sso_server'
+    request['Host'] = 'ssoserver:43220'
     request['Cookie'] = 'tresor_sso_id=testsession'
 
     Tresor::XACMLPDPMockServer.mock_action = :deny
@@ -86,15 +92,5 @@ describe 'An XACML PEP proxy' do
 
     expect(response.code).to eq '403'
     expect(response.body).to eq 'Forbidden'
-  end
-
-  after(:all) do
-    @proxy.stop
-    @webrick_sso_server.stop
-    @webrick_xacml_server.stop
-
-    while @proxy.started do sleep 0.1 end
-    until @webrick_sso_server.status.eql? :Stop do sleep 0.1 end
-    until @webrick_xacml_server.status.eql? :Stop do sleep 0.1 end
   end
 end

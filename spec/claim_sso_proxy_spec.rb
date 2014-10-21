@@ -29,14 +29,20 @@ describe 'An SSO proxy' do
     Thread.new do @proxy.start end
     Thread.new do @webrick_server.start end
 
-    until @proxy.started do sleep 0.1 end
-    until @webrick_server.status.eql? :Running do sleep 0.1 end
+    sleep 2
+  end
+
+  after(:all) do
+    @proxy.stop
+    @webrick_server.stop
+
+    sleep 2
   end
 
   it 'does not redirect if accessed by main hostname' do
     http = Net::HTTP.new('127.0.0.1', '43217')
     request = Net::HTTP::Get.new('/')
-    request['Host'] = 'proxy.local'
+    request['Host'] = 'proxy.local:43217'
 
     begin
       response = http.request request
@@ -67,7 +73,7 @@ describe 'An SSO proxy' do
     query_string_parts = Hash[location_url.query.split('&').map {|p| p.split('=')}]
 
     expect(query_string_parts['wa']).to eq 'wsignin1.0'
-    expect(query_string_parts['wtrealm']).to eq URI.encode_www_form_component('http://proxy.local/?wdycf_url=http://webrick.local/')
+    expect(query_string_parts['wtrealm']).to eq URI.encode_www_form_component('http://proxy.local:43217/?wdycf_url=http://webrick.local/')
     expect(query_string_parts['whr']).to eq URI.encode_www_form_component('http://home-realm.local')
   end
 
@@ -92,7 +98,7 @@ describe 'An SSO proxy' do
   it 'sends an error message, if no token is given' do
     http = Net::HTTP.new('127.0.0.1', '43217')
     request = Net::HTTP::Post.new("/?wdycf_url=#{URI.encode_www_form_component('http://webrick.local/')}")
-    request['Host'] = 'proxy.local'
+    request['Host'] = 'proxy.local:43217'
 
     begin
       response = http.request request
@@ -102,13 +108,5 @@ describe 'An SSO proxy' do
 
     expect(response.code).to eq '502'
     expect(response.body).to eq 'SSO token missing'
-  end
-
-  after(:all) do
-    @proxy.stop
-    @webrick_server.stop
-
-    while @proxy.started do sleep 0.1 end
-    until @webrick_server.status.eql? :Stop do sleep 0.1 end
   end
 end

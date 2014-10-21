@@ -21,7 +21,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
     backend_connection.send_data start_line
 
     headers = []
-    backend.client_connection.client_headers.each do |header, value|
+    request.client_headers.each do |header, value|
       next if header.eql?('Accept-Encoding') || header.eql?('Content-Length')
 
       if header.eql?('Cookie') && @tctp_cookie
@@ -34,14 +34,13 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
 
       # Send Host header of reverse URL
       if header.casecmp('host') == 0
-        headers << {'Host' => "#{backend.client_connection
-        }:#{parsed_host.port}".gsub(/\:(80|443)\Z/, '')}
+        headers << {'Host' => request.effective_backend_host}
       else
         headers << {header => value}
       end
     end
 
-    if backend.client_connection.client_headers.has_key? 'Content-Length'
+    if request.client_headers.has_key? 'Content-Length'
       headers << {'Transfer-Encoding' => 'chunked'}
       headers << {'Content-Encoding' => 'encrypted'}
     end
@@ -76,7 +75,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
     if @encrypted_response
       headers << {'Transfer-Encoding' => 'chunked'}
     else
-      log.warn (log_key) {"Got unencrypted response from #{backend.client_connection.host} (#{backend_connection.connection_pool_key}) for encrypted request #{build_start_line}!"}
+      log.warn (log_key) {"Got unencrypted response from #{request.effective_backend_scheme_authority} (#{backend_connection.connection_pool_key}) for encrypted request #{build_start_line}!"}
 
       @halec_promise.return
     end
@@ -122,7 +121,7 @@ class Tresor::Backend::TCTPEncryptToBackendHandler < Tresor::Backend::RelayingBa
   end
 
   def on_backend_message_complete
-    log.debug (log_key) { "Finished receiving backend response to #{backend.client_connection.http_method} #{backend.client_connection.path}#{backend.client_connection.query ? "?#{backend.client_connection.query}": ''}." }
+    log.debug (log_key) { "Finished receiving backend response to #{request.http_method} #{request.effective_backend_url}." }
 
     if @encrypted_response
       finish_response

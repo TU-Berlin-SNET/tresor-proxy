@@ -36,9 +36,7 @@ describe 'A set of tctp proxies' do
     Thread.new do @second_proxy.start end
     Thread.new do @webrick_server.start end
 
-    until @first_proxy.started do sleep 0.1 end
-    until @second_proxy.started do sleep 0.1 end
-    until @webrick_server.status.eql? :Running do sleep 0.1 end
+    sleep 2
   end
 
   after(:all) do
@@ -46,9 +44,7 @@ describe 'A set of tctp proxies' do
     @second_proxy.stop
     @webrick_server.stop
 
-    while @first_proxy.started do sleep 0.1 end
-    while @second_proxy.started do sleep 0.1 end
-    until @webrick_server.status.eql? :Stop do sleep 0.1 end
+    sleep 2
   end
 
   def proxy_uri

@@ -65,11 +65,15 @@ module Tresor::Proxy
 
       # Create backend as soon as all headers are complete
       http_parser.on_headers_complete = proc do |headers|
-        @request = Tresor::Proxy::Request.new(self, @http_parser)
+        begin
+          @request = Tresor::Proxy::Request.new(self, @http_parser)
 
-        log.debug (log_key) {"Headers complete. Request is #{@request.http_method} #{@request.request_url} HTTP/1.1"}
+          log.debug (log_key) {"Headers complete. Request is #{@request.http_method} #{@request.request_url} HTTP/1.1"}
 
-        decide_frontend_handler
+          decide_frontend_handler
+        rescue Exception => e
+          send_error_response e
+        end
       end
 
       http_parser.on_body = proc do |chunk|

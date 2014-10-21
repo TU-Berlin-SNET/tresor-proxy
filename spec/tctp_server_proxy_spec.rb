@@ -12,7 +12,7 @@ describe 'A tctp server proxy' do
     @proxy = Tresor::Proxy::TresorProxy.new '127.0.0.1', 'proxy.local', '43215', 'TCTP server proxy'
 
     @proxy.is_tctp_server = true
-    @proxy.reverse_mappings = { '127.0.0.1' => 'http://127.0.0.1:43216' }
+    @proxy.reverse_mappings = { 'secure.service' => 'http://127.0.0.1:43216' }
 
     SERVER_PROXY_TEST_SERVER = Tresor::TestServer.new
     @test_server = SERVER_PROXY_TEST_SERVER
@@ -27,8 +27,7 @@ describe 'A tctp server proxy' do
     Thread.new do @proxy.start end
     Thread.new do @webrick_server.start end
 
-    until @proxy.started do sleep 0.1 end
-    until @webrick_server.status.eql? :Running do sleep 0.1 end
+    sleep 2
   end
 
   after(:all) do
@@ -37,8 +36,7 @@ describe 'A tctp server proxy' do
     @proxy.stop
     @webrick_server.stop
 
-    while @proxy.started do sleep 0.1 end
-    until @webrick_server.status.eql? :Stop do sleep 0.1 end
+    sleep 2
   end
 
   it 'can be used to issue forward GET and POST request' do
@@ -52,7 +50,7 @@ describe 'A tctp server proxy' do
 
     # Post the client_hello to the HALEC creation URI, starting the handshake
     http = Net::HTTP.new('127.0.0.1', '43215')
-    request = Net::HTTP::Post.new('/halecs')
+    request = Net::HTTP::Post.new('/halecs', {'Host' => 'secure.service'})
     request.body = client_hello
 
     response = http.request request
@@ -70,7 +68,7 @@ describe 'A tctp server proxy' do
     client_response = client_halec.engine.extract
 
     # Post the TLS client response to the HALEC url
-    request = Net::HTTP::Post.new(URI(halec_url).path)
+    request = Net::HTTP::Post.new(URI(halec_url).path, {'Host' => 'secure.service'})
     request.body = client_response
 
     response = http.request request
@@ -83,7 +81,7 @@ describe 'A tctp server proxy' do
 
     # The handshake is now complete!
 
-    request = Net::HTTP::Get.new('/')
+    request = Net::HTTP::Get.new('/', {'Host' => 'secure.service'})
     request['Accept-Encoding'] = 'encrypted'
 
     response = http.request(request)
@@ -111,7 +109,7 @@ describe 'A tctp server proxy' do
     # Encrypts plaintext_test_body
     encrypted_body_io.write client_halec.encrypt_data(test_body)
 
-    request = Net::HTTP::Post.new('/')
+    request = Net::HTTP::Post.new('/', {'Host' => 'secure.service'})
     request.body = encrypted_body_io.string
     request['Accept-Encoding'] = 'encrypted'
     request['Content-Encoding'] = 'encrypted'

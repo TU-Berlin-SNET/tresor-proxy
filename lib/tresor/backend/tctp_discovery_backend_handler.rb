@@ -7,10 +7,10 @@ class Tresor::Backend::TCTPDiscoveryBackendHandler < Tresor::Backend::BackendHan
     @tctp_discovery_information = Tresor::TCTP::DiscoveryInformation.new
 
     backend_connection_future.callback do |backend_connection|
-      log.debug (log_key) { "Sending TCTP discovery to #{backend.client_connection.host}" }
+      log.debug (log_key) { "Sending TCTP discovery to #{request.effective_backend_scheme_authority}" }
 
       backend_connection.send_data "OPTIONS /* HTTP/1.1\r\n"
-      backend_connection.send_data "Host: #{backend.client_connection.host}\r\n"
+      backend_connection.send_data "Host: #{request.effective_backend_host}\r\n"
       backend_connection.send_data "Accept: text/prs.tctp-discovery\r\n"
       backend_connection.send_data "\r\n"
     end
@@ -20,11 +20,11 @@ class Tresor::Backend::TCTPDiscoveryBackendHandler < Tresor::Backend::BackendHan
     @headers = headers
 
     if backend_connection.http_parser.status_code == 200 && headers['Content-Type'].eql?('text/prs.tctp-discovery')
-      log.info (log_key) { "Host #{backend.client_connection.host} (#{backend_connection.connection_pool_key} is TCTP capable!" }
+      log.info (log_key) { "Host #{request.effective_backend_scheme_authority} (#{backend_connection.connection_pool_key} is TCTP capable!" }
 
       @tctp_host = true
     else
-      log.info (log_key) { "Host #{backend.client_connection.host} (#{backend_connection.connection_pool_key}) does not support TCTP." }
+      log.info (log_key) { "Host #{request.effective_backend_scheme_authority} (#{backend_connection.connection_pool_key}) does not support TCTP." }
     end
   end
 
@@ -38,9 +38,9 @@ class Tresor::Backend::TCTPDiscoveryBackendHandler < Tresor::Backend::BackendHan
     if @tctp_host
       @tctp_discovery_information.transform_raw_data!
 
-      Tresor::TCTP.host_discovery_information[backend.client_connection.host] = @tctp_discovery_information
+      Tresor::TCTP.host_discovery_information[request.effective_backend_scheme_authority] = @tctp_discovery_information
     else
-      Tresor::TCTP.host_discovery_information[backend.client_connection.host] = false
+      Tresor::TCTP.host_discovery_information[request.effective_backend_scheme_authority] = false
     end
 
     #Let backend reevaluate what to do

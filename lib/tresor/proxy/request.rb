@@ -127,6 +127,13 @@ module Tresor::Proxy
       end
     end
 
+    # The effective request URL, i.e., the path and query to be requested
+    # from the backend.
+    # @return [String] The effective request URL
+    def effective_backend_request_url
+      URI::Generic.build(:path => effective_backend_url.path, :query => effective_backend_url.query).to_s
+    end
+
     # The HTTP host header, which should be sent to the backend
     # @return [String] The http host
     def effective_backend_host
@@ -150,9 +157,15 @@ module Tresor::Proxy
     # additionally a host on forward requests.
     # @return [URI::HTTP]
     def request_url
-      parsed_request_url = URI.parse(requested_http_request_url)
-      parsed_request_url.path = '/' if parsed_request_url.path.eql?('')
-      parsed_request_url
+      case http_method
+        when 'CONNECT'
+          host, port = requested_http_request_url.split(':')
+          URI::Generic.build(:host => host, :port => port.to_i)
+        else
+          parsed_request_url = URI.parse(requested_http_request_url)
+          parsed_request_url.path = '/' if parsed_request_url.path.eql?('')
+          parsed_request_url
+      end
     end
 
     # The request is an HTTP forward request if the request_url contains a
@@ -255,7 +268,7 @@ module Tresor::Proxy
       requested_http_host[/(.+?)(?=\.)/]
     end
 
-    memoize :effective_request_url, :reverse_url, :effective_backend_url, :request_url, :http_forward?, :http_reverse?, :http_origin?, :http_relay?, :cookies, :query_vars
+    memoize :effective_request_url, :reverse_url, :effective_backend_url, :effective_backend_request_url, :request_url, :http_forward?, :http_reverse?, :http_origin?, :http_relay?, :cookies, :query_vars
 
     def proxy
       @connection.proxy
