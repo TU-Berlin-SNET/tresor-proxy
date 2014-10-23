@@ -73,8 +73,30 @@ The IP and port can be specified using `-i`, and `-p` respectively.
 
 The proxy can act as TCTP client and server:
 
-* ***TCTP client***: If the proxy makes backend connections, it will perform TCTP discovery with backend hosts. If a backend host supports TCTP, it will perform the TCTP handshake to create HALECs (HTTP Application-Layer Encryption Channels) and use these HALECs to encrypt HTTP traffic end-to-end.
-* ***TCTP server***: If the proxy is accessed by HTTP clients, it will respond to TCTP discovery requests and offer facilities to create HALECs and decrypt HTTP traffic.
+* ***TCTP client***: If the proxy makes backend connections, it will perform TCTP discovery with backend hosts. If a backend host supports TCTP, it will perform the TCTP handshake to create HALECs (HTTP Application-Layer Encryption Channels) and use these HALECs to encrypt relayed HTTP traffic end-to-end.
+* ***TCTP server***: If the proxy is accessed by HTTP clients, it will respond to TCTP discovery requests and offer facilities to create HALECs and encrypt HTTP traffic.
+
+## Reverse Proxying
+
+There are two sources for the retrieval of the reverse URLs of proxied services: _reverse mappings_ and a TRESOR broker.
+
+### Reverse mappings
+
+Reverse mappings are contained in a YAML file, whose path is given by `--reverse <path>`.
+
+It consists of pairs of incoming HTTP hostnames and URLs to the reverse hosts. The proxy uses the reverse URL as the HTTP `Host` header. The original HTTP hostname is retained in an additional `X-Forwarded-Host` header.
+
+This is an example reverse mapping file:
+
+    ---
+    'www.my-service.com': 'http://my-service.local'
+    'www.another-service.com': 'http://my-other-service.local'
+
+It would instruct to redirect all requests with `Host: www.my-service.com` to the server `http://my-service.local`. The backend server would receive the headers `Host: my-service.local` and `X-Forwarded-Host: www.my-service.com`.
+
+### Reverse proxying by using the TRESOR broker
+
+If specifying the URL to a TRESOR broker using `-b <TRESOR broker URL>`, the TRESOR broker would be queried for the endpoint of a booked service of the current TRESOR client, which would have the same symbolic name as the part of the hostname preceding the first dot. For example: if the Proxy is queried for `servicea.service.cloud-tresor.de` it would query the broker for `servicea`.
 
 ## TLS functionality
 
@@ -88,6 +110,6 @@ The path to the TLS server certificate can be specified through the `--tls_crt` 
 
 The path to the TLS server certificate keyfile is specified through the `--tls_key` command line option. The key file path has to point to a readable file that must contain a private key in the [PEM format](http://en.wikipedia.org/wiki/Privacy-enhanced_Electronic_Mail).
 
-## Single sign-on and hostname
+## Single sign-on
 
-The HTTP hostname of the proxy, used for the Single-sign on functionality is configured through `-n`.
+The proxy can authenticate users by redirecting them to a Federation Provider and processing the resulting SAML tokens. This functionality needs the options `--fpurl <URL>` for specifying the URL of the federation provider, `--hrurl <URL>` for specifying the home realm URL, and `-n <hostname>` for specifying the hostname to be used for processing SAML tokens.
