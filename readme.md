@@ -71,20 +71,31 @@ The IP and port can be specified using `-i`, and `-p` respectively.
 
 ## Trusted Cloud Transfer Protocol (TCTP) support
 
-The proxy can act as TCTP client and server:
+The proxy can act as TCTP client and TCTP server.
 
-* ***TCTP client***: If the proxy makes backend connections, it will perform TCTP discovery with backend hosts. If a backend host supports TCTP, it will perform the TCTP handshake to create HALECs (HTTP Application-Layer Encryption Channels) and use these HALECs to encrypt relayed HTTP traffic end-to-end.
-* ***TCTP server***: If the proxy is accessed by HTTP clients, it will respond to TCTP discovery requests and offer facilities to create HALECs and encrypt HTTP traffic.
+### TCTP client
 
-## Reverse Proxying
+The TCTP client mode is activated through `--tctp_client`.
 
-There are two sources for the retrieval of the reverse URLs of proxied services: _reverse mappings_ and a TRESOR broker.
+In this mode, the proxy performs TCTP discovery with backend hosts and performs the TCTP handshake and HTTP end-to-end traffic encryption if a backend hosts supports TCTP.
 
-### Reverse mappings
+### TCTP server
 
-Reverse mappings are contained in a YAML file, whose path is given by `--reverse <path>`.
+The TCTP server mode is activated through `--tctp_server`.
 
-It consists of pairs of incoming HTTP hostnames and URLs to the reverse hosts. The proxy uses the reverse URL as the HTTP `Host` header. The original HTTP hostname is retained in an additional `X-Forwarded-Host` header.
+In this mode, the proxy offers TCTP discovery, handshaking and traffic encryption facilities to connecting clients.
+
+## Reverse proxying
+
+The proxy can relay HTTP requests and responses to backend servers if given _reverse mappings_ of proxied service URLs.
+
+There are two sources for the retrieval of such URLs: a _reverse mapping file_ and a TRESOR broker.
+
+### Reverse mapping files
+
+Reverse mappings can be contained in a YAML file, whose path is given by `--reverse <path>`.
+
+It consists of pairs of incoming HTTP hostnames and URLs to the reverse hosts. The proxy uses the reverse URL as the HTTP `Host` header in relayed requests. The original HTTP hostname is relayed as an additional `X-Forwarded-Host` header.
 
 This is an example reverse mapping file:
 
@@ -94,9 +105,9 @@ This is an example reverse mapping file:
 
 It would instruct to redirect all requests with `Host: www.my-service.com` to the server `http://my-service.local`. The backend server would receive the headers `Host: my-service.local` and `X-Forwarded-Host: www.my-service.com`.
 
-### Reverse proxying by using the TRESOR broker
+### The TRESOR broker as reverse mappings source
 
-If specifying the URL to a TRESOR broker using `-b <TRESOR broker URL>`, the TRESOR broker would be queried for the endpoint of a booked service of the current TRESOR client, which would have the same symbolic name as the part of the hostname preceding the first dot. For example: if the Proxy is queried for `servicea.service.cloud-tresor.de` it would query the broker for `servicea`.
+If specifying the URL of a TRESOR broker using `-b <TRESOR broker URL>`, the TRESOR broker would be queried for the endpoint of a booked service of the current TRESOR client, which would have the same symbolic name as the part of the hostname preceding the first dot. For example: if the Proxy is queried for `servicea.service.cloud-tresor.de` it would query the broker for the endpoint URL of `servicea`.
 
 ## TLS functionality
 
@@ -104,7 +115,7 @@ To enable TLS secured traffic, specify the `--tls` command line option.
 
 ### TLS Server certificate
 
-The path to the TLS server certificate can be specified through the `--tls_crt` command line option. The certificate has to be a readable file that contants a chain of X509 certificates in the [PEM format](http://en.wikipedia.org/wiki/Privacy-enhanced_Electronic_Mail), with the most-resolved certificate at the top of the file, successive intermediate certs in the middle, and the root (or CA) cert at the bottom.
+The path to the TLS server certificate can be specified through the `--tls_crt` command line option. The certificate has to be a readable file that contains a chain of X509 certificates in the [PEM format](http://en.wikipedia.org/wiki/Privacy-enhanced_Electronic_Mail), with the most-resolved certificate at the top of the file, successive intermediate certs in the middle, and the root (or CA) cert at the bottom.
 
 ### TLS Server certificate keyfile
 
@@ -112,4 +123,10 @@ The path to the TLS server certificate keyfile is specified through the `--tls_k
 
 ## Single sign-on
 
-The proxy can authenticate users by redirecting them to a Federation Provider and processing the resulting SAML tokens. This functionality needs the options `--fpurl <URL>` for specifying the URL of the federation provider, `--hrurl <URL>` for specifying the home realm URL, and `-n <hostname>` for specifying the hostname to be used for processing SAML tokens.
+The proxy can authenticate users by redirecting them to a Federation Provider and processing the resulting SAML token. This functionality needs the options `--fpurl <URL>` for specifying the URL of the federation provider, `--hrurl <URL>` for specifying the home realm URL, and `-n <hostname>` for specifying the hostname to be used for processing SAML tokens.
+
+## XACML-based RESTful authorization
+
+The proxy can query an XACML PDP (Policy Decision Point) for authorization decisions about to be relayed HTTP requests. The URL to the PDP can be specified using `--pdpurl <URL of PDP>`. HTTP basic authentication is supported when the username and password are contained in the URL.
+
+The template of the XACML request can be found in [lib/tresor/frontend/xacml/xacml_request.erb](https://github.com/TU-Berlin-SNET/tresor-proxy/blob/master/lib/tresor/frontend/xacml/xacml_request.erb).
