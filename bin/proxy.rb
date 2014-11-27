@@ -17,6 +17,7 @@ opts = Slop.parse(ARGV, :help => true) do
   on 't', 'trace', 'Enable tracing'
   on 'l=', 'loglevel', 'Specify log level (FATAL, ERROR, WARN, INFO, DEBUG - default INFO)'
   on 'logfile=', 'Specify log file'
+  on 'logserver=', 'Specify remote logstash server uri, e.g., tcp://example.org:12345'
   on 'C', 'tctp_client', 'Enable TCTP client'
   on 'S', 'tctp_server', 'Enable TCTP server'
   on 'tls', 'Enable TLS'
@@ -36,6 +37,7 @@ EventMachine.threadpool_size = opts[:threadpool] || 20
 proxy = Tresor::Proxy::TresorProxy.new(opts[:ip] || '0.0.0.0', opts[:hostname] || 'proxy.local', opts[:port] || '80', 'TRESOR Proxy', opts[:tls] || false, opts[:tls_key], opts[:tls_crt])
 
 proxy.log.level = Logger.const_get(opts[:loglevel] || 'INFO')
+proxy.logserver = opts[:logserver]
 
 proxy.is_tctp_client = opts[:tctp_client]
 proxy.is_tctp_server = opts[:tctp_server]

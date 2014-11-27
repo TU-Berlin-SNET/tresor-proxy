@@ -124,10 +124,19 @@ module Tresor
 
       def on_backend_message_complete
         relay "0\r\n\r\n" if client_transfer_chunked?
+
+        EM.defer do
+          log_remote(Logger::INFO, {
+            category: 'Routing',
+            message: "Successfully relayed #{request.http_method} #{request.effective_request_url} to #{request.effective_backend_url}",
+            'client-id' => request.subject_organization_uuid,
+            'subject-id' => request.subject_id
+          })
+        end
       end
 
       def log_key
-        "#{@backend.proxy.name} - Relay Handler"
+        "#{proxy.name} - Relay Handler"
       end
 
       def relay_as_chunked(data)
@@ -138,6 +147,14 @@ module Tresor
 
           relay "#{chunk_length_as_hex}\r\n#{data}\r\n"
         end
+      end
+
+      def proxy
+        backend.proxy
+      end
+
+      def request
+        backend.client_connection.request
       end
     end
   end

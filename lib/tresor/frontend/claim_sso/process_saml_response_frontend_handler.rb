@@ -70,6 +70,13 @@ module Tresor
                 connection.send_data "Location: #{wdycf_url}\r\n\r\n"
                 connection.send_data build_html_response(wdycf_url)
               end
+
+              log_remote(Logger::INFO, {
+                category: 'Authentication',
+                message: "Successfully authenticated user #{security_token.name_id} for access to #{connection.request.query_vars['wdycf_url']}",
+                'client-id' => security_token.tresor_organization_uuid,
+                'subject-id' => security_token.name_id
+              })
             end
           else
             connection.send_error_response Exception.new('SSO token missing')

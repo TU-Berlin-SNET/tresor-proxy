@@ -4,6 +4,20 @@ module Tresor
       def log
         Tresor::Proxy::TresorProxy.class_variable_get :@@logger
       end
+
+      def log_remote(severity, hash)
+        begin
+          log_hash = {
+            'tresor-component' => 'Proxy',
+            'logger' => self.class.name,
+            'priority' => Logger::Severity.constants.find{ |name| Logger::Severity.const_get(name) == severity }
+          }.merge(hash)
+
+          proxy.logstash_logger.log severity, log_hash if proxy.logstash_logger
+        rescue Exception => e
+          puts e
+        end
+      end
     end
   end
 end

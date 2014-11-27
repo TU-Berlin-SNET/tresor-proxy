@@ -1,4 +1,5 @@
 require 'logger'
+require 'logstash-logger'
 
 module Tresor::Proxy
   class TresorProxy
@@ -77,6 +78,11 @@ module Tresor::Proxy
     # @return [Hash[String => String]] A mapping of SSO session ID to ClaimSSOSecurityToken
     attr_accessor :sso_sessions
 
+    # The IP and port of the logging server
+    # !@attr [rw] logserver
+    # @return [String] The IP and port of the logging server
+    attr_accessor :logserver
+
     # The proxy connection pool
     # !@attr [r] connection_pool
     # @return [Tresor::Proxy::ConnectionPool]
@@ -125,6 +131,16 @@ module Tresor::Proxy
       @stop_proc = proc do
         @started = false
       end
+    end
+
+    def logstash_logger
+      return nil unless logserver
+
+      if !@logstash_logger
+        @logstash_logger = LogStashLogger.new(uri: logserver)
+      end
+
+      @logstash_logger
     end
 
     def start

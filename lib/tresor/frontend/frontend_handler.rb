@@ -21,6 +21,10 @@ module Tresor
       def log_key
         "#{connection.log_key} - #{self.class.name.demodulize}"
       end
+
+      def proxy
+        @connection.proxy
+      end
     end
   end
 end
