@@ -88,11 +88,21 @@ module Tresor
 
                 parsed_response = Nokogiri::XML(http_response.body)
 
-                @decision = parsed_response.xpath('/x:Response/x:Result/x:Decision/text()', 'x' => 'urn:oasis:names:tc:xacml:3.0:core:schema:wd-17').to_s
+                decision = parsed_response.xpath('/x:Response/x:Result/x:Decision/text()', 'x' => 'urn:oasis:names:tc:xacml:3.0:core:schema:wd-17').to_s
 
-                request.additional_headers_to_relay << {'TRESOR-XACML-Decision' => @decision}
+                request.additional_headers_to_relay << {'TRESOR-XACML-Decision' => decision}
 
-                return @decision.eql? 'Permit'
+                if decision.eql? 'Indeterminate'
+                  missing_attributes = parsed_response.xpath('/x:Response/x:Result/x:Status/x:StatusDetail/x:MissingAttributeDetail/@AttributeId', 'x' => 'urn:oasis:names:tc:xacml:3.0:core:schema:wd-17')
+
+                  missing_attributes.each do |attribute|
+                    unless attribute.to_s.blank?
+                      request.additional_headers_to_relay << {'TRESOR-XACML-Missing-Attribute' => attribute.to_s}
+                    end
+                  end
+                end
+
+                return decision.eql? 'Permit'
               rescue Exception => e
                 request.additional_headers_to_relay << {'TRESOR-XACML-Error' => e.to_s}
 
@@ -134,12 +144,19 @@ module Tresor
       end
 
       def on_message_complete
-        connection.send_data "HTTP/1.1 403 Forbidden\r\n"
+        http_status = indeterminate_response? ? '307 Temporary Redirect' : '403 Forbidden'
+
+        send_response_message(http_status)
+      end
+
+      def send_response_message(http_status)
+        connection.send_data "HTTP/1.1 #{http_status}\r\n"
         connection.send_data "Host: #{connection.proxy.hostname}\r\n"
+        connection.send_data "Content-Type: text/html; charset=UTF-8\r\n"
 
         connection.relay_additional_headers
 
-        message = build_message
+        message = "<!doctype html><html><head/><body>#{build_message}</body>"
 
         connection.send_data "Content-Length: #{message.length}\r\n\r\n"
         connection.send_data message
@@ -157,12 +174,24 @@ module Tresor
                 return "Error while communicating with PDP\r\n#{value}"
               when 'TRESOR-XACML-Exception'
                 return "General error in XACML module:\r\n#{value}"
+              when 'TRESOR-XACML-Missing-Attribute'
+                sso_redirect_url = get_sso_redirect_url(value)
+
+                return "Missing Attribute #{value}<br/>Please authenticate: <a href='#{sso_redirect_url}'>#{sso_redirect_url}</a>"
             end
           end
         end
 
         #TODO Give more specific error
         return 'Forbidden'
+      end
+
+      def indeterminate_response?
+        connection.request.additional_headers_to_relay_hash['TRESOR-XACML-Decision'].eql? 'Indeterminate'
+      end
+
+      def get_sso_redirect_url(attribute)
+        ::Tresor::Frontend::ClaimSSO::RedirectToSSOFrontendHandler.build_redirect_url(connection, 'http://tresor.snet.tu-berlin.de/secure')
       end
     end
   end

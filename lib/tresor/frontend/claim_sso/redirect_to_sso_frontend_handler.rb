@@ -11,6 +11,28 @@ module Tresor
             !connection.request.http_origin? &&
             connection.request.sso_session.blank?
           end
+
+          def build_redirect_url(conn, whr_url)
+            "#{conn.proxy.fpurl}/?wa=wsignin1.0&wtrealm=#{build_wtrealm_url(conn)}&whr=#{build_whr_url(whr_url)}"
+          end
+
+          def build_wtrealm_url(conn)
+            wdycf_url = URI.encode_www_form_component(conn.request.effective_request_url.to_s)
+
+            wtrealm_url = URI("#{conn.proxy.scheme}://#{conn.proxy.hostname}:#{conn.proxy.port}/?wdycf_url=#{wdycf_url}")
+
+            return URI.encode_www_form_component(wtrealm_url.to_s)
+          end
+
+          def build_whr_url(whr_url)
+            URI.encode_www_form_component(whr_url)
+          end
+
+          def build_http_response(conn)
+            redirect_url = build_redirect_url(conn, conn.proxy.hrurl)
+
+            "<http><head></head><body><p>Please authenticate:</p><p><a href='#{redirect_url}'>#{redirect_url}</a></p></body></html>"
+          end
         end
 
         # @param [Tresor::Proxy::Connection] connection
@@ -34,23 +56,11 @@ module Tresor
         end
 
         def build_redirect_url
-          "#{connection.proxy.fpurl}/?wa=wsignin1.0&wtrealm=#{build_wtrealm_url}&whr=#{build_whr_url}"
-        end
-
-        def build_wtrealm_url
-          wdycf_url = connection.request.effective_request_url.to_s
-
-          wtrealm_url = URI("#{connection.proxy.scheme}://#{connection.proxy.hostname}:#{connection.proxy.port}/?wdycf_url=#{wdycf_url}")
-
-          return URI.encode_www_form_component(wtrealm_url.to_s)
-        end
-
-        def build_whr_url
-          URI.encode_www_form_component(connection.proxy.hrurl)
+          self.class.build_redirect_url(connection, proxy.hrurl)
         end
 
         def build_http_response
-          "<http><head></head><body><p>Please authenticate:</p><p><a href='#{build_redirect_url}'>#{build_redirect_url}</a></p></body></html>"
+          self.class.build_http_response(connection)
         end
       end
     end

@@ -84,7 +84,7 @@ module Tresor
         end
 
         def build_wdycf_url(id)
-          parsed_wdycf_url = URI(connection.request.query_vars['wdycf_url'])
+          parsed_wdycf_url = URI(URI.decode_www_form_component(connection.request.query_vars['wdycf_url']))
 
           if parsed_wdycf_url.query.present?
             parsed_wdycf_url.query += "&tresor_sso_id=#{id}"

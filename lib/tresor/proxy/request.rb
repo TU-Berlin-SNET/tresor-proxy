@@ -274,6 +274,14 @@ module Tresor::Proxy
       @connection.proxy
     end
 
+    def additional_headers_to_relay_hash
+      Hash[additional_headers_to_relay.map(&:first)]
+    end
+
+    def additional_headers_to_send_hash
+      Hash[additional_headers_to_send_hash.map(&:first)]
+    end
+
     private
       def add_forward_headers
         if http_reverse?
