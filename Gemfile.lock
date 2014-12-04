@@ -83,6 +83,7 @@ PLATFORMS
 
 DEPENDENCIES
   activesupport
+  daemons
   eventmachine (~> 1.0.3)
   faker
   fuubar

@@ -70,26 +70,32 @@ Thread.new do
   proxy.start
 end
 
-puts 'Press any key to exit'
+at_exit do
+  if opts.trace?
+    if RUBY_PLATFORM != 'java' then
+      result = RubyProf.stop
 
-$stdin.gets.chomp!
+      printer = RubyProf::CallTreePrinter.new(result)
+      File.open('profile-results', 'w') do |f|
+        printer.print(f)
+      end
+    else
+      result = JRuby::Profiler.stop
 
-proxy.stop
-
-if opts.trace?
-  if RUBY_PLATFORM != 'java' then
-    result = RubyProf.stop
-
-    printer = RubyProf::CallTreePrinter.new(result)
-    File.open('profile-results', 'w') do |f|
-      printer.print(f)
-    end
-  else
-    result = JRuby::Profiler.stop
-
-    printer = JRuby::Profiler::GraphPrinter.new(result)
-    File.open('profile-results', 'w') do |f|
-      printer.printProfile(f)
+      printer = JRuby::Profiler::GraphPrinter.new(result)
+      File.open('profile-results', 'w') do |f|
+        printer.printProfile(f)
+      end
     end
   end
+end
+
+puts 'Press any key to exit'
+
+input = $stdin.gets
+
+if input
+  proxy.stop
+else
+  sleep
 end

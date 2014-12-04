@@ -177,7 +177,7 @@ module Tresor
               when 'TRESOR-XACML-Missing-Attribute'
                 sso_redirect_url = get_sso_redirect_url(value)
 
-                return "Missing Attribute #{value}<br/>Please authenticate: <a href='#{sso_redirect_url}'>#{sso_redirect_url}</a>"
+                return "<p>Missing Attribute #{value}</p><p>Please authenticate: <a href='#{sso_redirect_url}'>here</a></p>"
             end
           end
         end
