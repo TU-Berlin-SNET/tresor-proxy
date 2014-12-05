@@ -12,7 +12,7 @@ Its main functions are:
 * Claims-based SSO, currently implemented through Microsoft Active Directory Federation Services Federation Provider
 * Using the TRESOR Broker for routing of booked services
 
-# Install and Run
+# Installing
 
 The proxy can either be executed via docker, or through manually cloning the repo.
 
@@ -20,19 +20,54 @@ The proxy can either be executed via docker, or through manually cloning the rep
 
 There is an [automated build for the latest proxy version](https://registry.hub.docker.com/u/mathiasslawik/tresor-proxy) in the docker registry.
 
-To run the proxy, just execute the image, specifying the applicable proxy command line options:
-
-    docker run -i -t mathiasslawik/tresor-proxy <options>
-
 ## Manually
 
 The proxy requires at least Ruby 2.0 (MRI). It was tested on Linux (Ubuntu 14.04 LTS) and Windows 8.1.
 
 To install, clone the GitHub repo and use `bundle install` in the root folder.
 
+# Running
+
+## Via Docker
+
+To run the proxy, just execute the image, specifying the applicable proxy command line options:
+
+    docker run -i -t mathiasslawik/tresor-proxy <proxy options>
+
+## Manually, as a ruby script
+
 To run the proxy, execute the following command in the cloned repo:
 
-    bundle exec ruby bin/proxy.rb <options>
+    bundle exec ruby bin/proxy.rb <proxy options>
+
+## Manually, as a daemon
+
+To run the proxy as a daemon, execute the following command in the cloned repo:
+
+    bundle exec ruby bin/proxy_daemon.rb <command> <daemon options> -- <proxy options>
+
+The daemon can be configured using commands and daemon options:
+
+    Usage: proxy.rb <command> <options> -- <application options>
+
+    * where <command> is one of:
+      start         start an instance of the application
+      stop          stop all instances of the application
+      restart       stop all instances and restart them afterwards
+      reload        send a SIGHUP to all instances of the application
+      run           start the application and stay on top
+      zap           set the application to a stopped state
+      status        show status (PID) of application instances
+
+    * and where <options> may contain several of the following:
+
+        -t, --ontop                      Stay on top (does not daemonize)
+        -f, --force                      Force operation
+        -n, --no_wait                    Do not wait for processes to stop
+
+    Common options:
+        -h, --help                       Show this message
+            --version                    Show version
 
 # Proxy configuration
 
@@ -130,3 +165,41 @@ The proxy can authenticate users by redirecting them to a Federation Provider an
 The proxy can query an XACML PDP (Policy Decision Point) for authorization decisions about to be relayed HTTP requests. The URL to the PDP can be specified using `--pdpurl <URL of PDP>`. HTTP basic authentication is supported when the username and password are contained in the URL.
 
 The template of the XACML request can be found in [lib/tresor/frontend/xacml/xacml_request.erb](https://github.com/TU-Berlin-SNET/tresor-proxy/blob/master/lib/tresor/frontend/xacml/xacml_request.erb).
+
+# HTTP Headers
+
+The proxy adds a set of HTTP headers to requests and responses. These can be used for AAA purposes if securely combined with TLS.
+
+## Request Headers
+
+The following HTTP headers are added to the HTTP request to the backend service:
+
+|------------------------+-----+----------------|
+|Header name             |Multi|Description     |
+|------------------------+-----+----------------|
+|TRESOR-Attribute        |0...n|Attributes of the authenticated subject in the form "<URL> <value>".
+|TRESOR-Service-UUID     |0...1|The TRESOR broker service UUID to which this request belongs, if integrated with a cloud broker.
+|TRESOR-Identity         |0...1|The identity of the authenticated subject, e.g., `DHZB\JStock`, if SSO is enabled
+|TRESOR-Organization     |0...1|The intentifier of the organization of the authenticated subject, e.g., `MEDISITE` if SSO is enabled.
+|TRESOR-Organization-UUID|0...1|The TRESOR broker organization UUID of the current subject, if SSO and broker integration are enabled.
+|X-Forwarded-Host        |0...1|The HTTP Host, which the subject used to invoke this request, if reverse proxying.
+|------------------------+-----+----------------|
+
+
+## Response Headers
+
+The following HTTP headers are added to the HTTP response to the client:
+
+|----------------------------+-----+-----------|
+|Header name                 |Multi|Description|
+|----------------------------+-----+-----------|
+|TRESOR-Broker-Exception     |0...1|An exception if it was thrown in the broker integration.
+|TRESOR-Broker-Requested-Name|0...1|The name which was used to identify the service in a cloud broker, e.g. `tresordemo` when using ´tresordemo.service.cloud-tresor.de` as the frontend hostname.
+|TRESOR-Broker-Response      |0...1|The response of a cloud broker.
+|TRESOR-XACML-Decision       |0...1|The XACML decision (e.g. 'Permit', 'Deny', 'Intermediate')
+|TRESOR-XACML-Error          |0...1|The XACML error description.
+|TRESOR-XACML-HTTP-Error     |0...1|An XACML HTTP error, e.g., if parsing the response failed.
+|TRESOR-XACML-Exception      |0...1|An exception which would be thrown in the XACML module.
+|TRESOR-XACML-Response       |0...1|The response from the PDP.
+|TRESOR-XACML-Request        |0...1|The proxy PEP request, which is to be sent to the PDP.
+|----------------------------+-----+-----------|
