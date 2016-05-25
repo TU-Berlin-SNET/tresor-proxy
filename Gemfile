@@ -1,10 +1,11 @@
 source 'https://rubygems.org'
 
 gem 'activesupport'
-gem 'eventmachine', '~> 1.0.3'
+gem 'eventmachine', '~> 1.2.0'
 gem 'http_parser.rb', '0.6.0.beta.2'
-gem 'slop'
+gem 'slop', '~> 3.6.0'
 gem 'rack-tctp'#, :path => '../tctp-rack'
+gem 'json', '~> 1.8.3'
 
 group :test do
   gem 'rspec-prof'

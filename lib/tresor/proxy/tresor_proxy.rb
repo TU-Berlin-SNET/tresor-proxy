@@ -147,7 +147,7 @@ module Tresor::Proxy
       begin
         EM.epoll
         EM.run do
-          trap("KILL") { stop }
+          #trap("KILL") { stop }
           trap("TERM") { stop }
           trap("INT")  { stop }
 
